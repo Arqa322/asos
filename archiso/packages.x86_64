@@ -131,7 +131,7 @@ noto-fonts-emoji
 ttf-dejavu
 ttf-liberation
 ttf-jetbrains-mono-nerd
-ttf-font-awesome
+otf-font-awesome
 
 # ---------- Internet / communication ----------
 firefox
@@ -151,6 +151,8 @@ hyphen
 hyphen-en
 zathura
 zathura-pdf-mupdf
+tesseract-data-eng
+tesseract-data-rus
 xournalpp
 mousepad
 qalculate-gtk
@@ -173,6 +175,51 @@ gamescope
 prismlauncher
 lib32-pipewire
 lib32-libpulse
+
+# ---------- Embedded: Arduino / microcontrollers ----------
+# (Arduino IDE 2, tio, cutecom, mpremote come from AUR: see archiso/packages.aur)
+arduino-cli
+arduino-language-server
+avrdude
+esptool
+dfu-util
+dfu-programmer
+stlink
+openocd
+flashrom
+platformio-core
+platformio-core-udev
+python-pyserial
+python-pipx
+picocom
+minicom
+moserial
+pulseview
+sigrok-cli
+sigrok-firmware-fx2lafw
+code
+
+# ---------- Embedded: NanoPi / ARM single-board computers ----------
+# (rkdeveloptool and xfel come from AUR: see archiso/packages.aur)
+aarch64-linux-gnu-gcc
+aarch64-linux-gnu-gdb
+qemu-user-static
+qemu-user-static-binfmt
+uboot-tools
+dtc
+sunxi-tools
+android-tools
+rpi-imager
+caligula
+avahi
+nss-mdns
+sshpass
+pv
+pigz
+cmake
+ninja
+meson
+ccache
 
 # ---------- Sysadmin: monitoring / diagnostics ----------
 htop
@@ -298,7 +345,7 @@ dust
 tealdeer
 unzip
 zip
-p7zip
+7zip
 unrar
 python
 python-pip

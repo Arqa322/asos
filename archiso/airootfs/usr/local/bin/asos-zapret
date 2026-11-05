@@ -122,6 +122,8 @@ clean_list() { # strip comments / blank lines / CR
 	[[ -r "$1" ]] && sed -e 's/\r$//' -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$1" || true
 }
 
+never_empty() { [[ -s "$1" ]] || echo "$2" >"$1"; }
+
 prepare() {
 	[[ -x "$ZAPRET_DIR/nfqws" ]] || die "$ZAPRET_DIR/nfqws not found — image was built without zapret"
 	[[ -d "$FS_DIR" ]] || die "$FS_DIR not found — image was built without Flowseal strategies"
@@ -137,10 +139,16 @@ prepare() {
 	# user lists (+ Atom game pack)
 	{
 		clean_list "$USER_LISTS/list-general-user.txt"
-		[[ "$ATOM_PACK" == 1 ]] && clean_list "$ATOM_DIR/list-atom-games.txt"
+		if [[ "$ATOM_PACK" == 1 ]]; then clean_list "$ATOM_DIR/list-atom-games.txt"; fi
 	} | sort -u >"$RUN/lists/list-general-user.txt"
 	clean_list "$USER_LISTS/list-exclude-user.txt" >"$RUN/lists/list-exclude-user.txt"
 	clean_list "$USER_LISTS/ipset-exclude-user.txt" >"$RUN/lists/ipset-exclude-user.txt"
+	# like Flowseal: never leave a list empty (an empty list means "match everything")
+	never_empty "$RUN/lists/list-general-user.txt" domain.example.abc
+	never_empty "$RUN/lists/list-exclude-user.txt" domain.example.abc
+	never_empty "$RUN/lists/ipset-exclude-user.txt" "$IPSET_PLACEHOLDER"
+	for l in list-general.txt list-google.txt list-exclude.txt; do never_empty "$RUN/lists/$l" domain.example.abc; done
+	never_empty "$RUN/lists/ipset-exclude.txt" "$IPSET_PLACEHOLDER"
 
 	# ipset-all according to IPSET_MODE
 	case "$IPSET_MODE" in
@@ -149,11 +157,11 @@ prepare() {
 		loaded)
 			{
 				clean_list "$FS_DIR/lists/ipset-all-loaded.txt"
-				[[ "$ATOM_PACK" == 1 ]] && clean_list "$ATOM_DIR/ipset-atom-games.txt"
+				if [[ "$ATOM_PACK" == 1 ]]; then clean_list "$ATOM_DIR/ipset-atom-games.txt"; fi
 				clean_list "$USER_LISTS/ipset-user.txt"
 			} | sort -u >"$RUN/lists/ipset-all.txt"
 			# never leave it empty in "loaded" mode (empty = match everything)
-			[[ -s "$RUN/lists/ipset-all.txt" ]] || echo "$IPSET_PLACEHOLDER" >"$RUN/lists/ipset-all.txt"
+			never_empty "$RUN/lists/ipset-all.txt" "$IPSET_PLACEHOLDER"
 			;;
 		*) die "IPSET_MODE must be none|any|loaded (got '$IPSET_MODE')" ;;
 	esac

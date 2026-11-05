@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=NanoPi: инструменты ASOS
+Comment=Прошивка microSD, UART-консоль, поиск в сети, maskrom/FEL, кросс-компиляция
+Exec=kitty --title asos-nanopi -e asos-nanopi menu
+Icon=computer
+Terminal=false
+Type=Application
+Categories=Development;Electronics;System;
+Keywords=nanopi;friendlyelec;rockchip;allwinner;sbc;uart;sd;

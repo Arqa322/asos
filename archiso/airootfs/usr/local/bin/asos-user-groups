@@ -2,6 +2,6 @@
 # Add a user to the ASOS default groups (skips groups that do not exist).
 set -euo pipefail
 user=${1:?usage: asos-user-groups <user>}
-for g in wheel audio video input storage network docker libvirt kvm wireshark gamemode; do
+for g in wheel audio video input storage network uucp lock docker libvirt kvm wireshark gamemode; do
 	getent group "$g" >/dev/null && usermod -aG "$g" "$user" || true
 done

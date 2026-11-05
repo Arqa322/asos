@@ -8,6 +8,9 @@
  SUPER + E              файловый менеджер (Thunar)
  SUPER + B              браузер (Firefox)
  SUPER + O              LibreOffice
+ SUPER + A              Arduino IDE 2
+ SUPER + Shift + A      помощник Arduino (порты, загрузка, монитор, ядра)
+ SUPER + Shift + N      инструменты NanoPi (microSD, UART, поиск, maskrom)
  SUPER + Z              меню zapret (стратегии, game filter, Atom)
  SUPER + C              история буфера обмена
  SUPER + L              заблокировать экран
@@ -26,5 +29,8 @@
  asos-zapret            статус zapret (menu, list, set, game, ipset, atom, check)
  asos-game <cmd>        запуск игры с gamemode + MangoHud
                         (в Steam: asos-game %command%)
+ asos-arduino           Arduino: doctor, boards, upload, monitor, setup esp32 ...
+ asos-nanopi            NanoPi: boards, find, console, flash, share, chroot ...
+ pio                    PlatformIO Core;  esptool / mpremote — ESP32 и MicroPython
  sudo asos-install      установка ASOS на диск
  btop / htop / glances  мониторинг

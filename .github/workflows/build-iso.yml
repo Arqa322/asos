@@ -1,6 +1,8 @@
 name: Build ASOS ISO
 
 on:
+  pull_request:
+    paths: ["archiso/**", "scripts/**", "build.sh", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       release:
@@ -14,9 +16,24 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # Fast sanity check (~1 min): every package exists, dependencies resolve,
+  # no package/file conflicts, AUR packages build from official deps.
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          for f in build.sh scripts/*.sh archiso/airootfs/usr/local/bin/*; do bash -n "$f"; done
+      - name: Validate package lists against Arch repositories
+        run: python3 scripts/check-packages.py
+
+  build:
+    needs: check
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
     steps:
       - name: Free disk space
         run: |

@@ -27,5 +27,9 @@ file_permissions=(
   ["/usr/local/bin/asos-game"]="0:0:755"
   ["/usr/local/bin/asos-user-groups"]="0:0:755"
   ["/usr/local/bin/asos-power"]="0:0:755"
+  ["/usr/local/bin/asos-arduino"]="0:0:755"
+  ["/usr/local/bin/asos-nanopi"]="0:0:755"
+  ["/usr/share/asos/embedded/examples/nanopi-hello/deploy.sh"]="0:0:755"
+  ["/usr/share/asos/embedded/examples/serial-bridge.py"]="0:0:755"
   ["/opt/zapret/nfqws"]="0:0:755"
 )

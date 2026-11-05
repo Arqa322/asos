@@ -1,0 +1,20 @@
+# ============================================================
+#  AUR packages built by scripts/build-aur.sh into a local
+#  repository before mkarchiso runs. A package that fails to
+#  build is skipped (the ISO is still produced without it).
+#  Order matters only if one AUR package depends on another.
+# ============================================================
+
+# Arduino IDE 2.x (official upstream binary release)
+arduino-ide-bin
+# Serial terminals
+tio
+cutecom
+# MicroPython: remote control / file transfer for ESP32, RP2040 ...
+mpremote
+# Rockchip USB maskrom flashing (NanoPi R2S/R4S/R5S/R6S/M4/M6/T6 ...)
+rkdeveloptool-git
+# Allwinner FEL tool (NanoPi NEO/NEO2/NEO Air/Duo ...)
+xfel
+# AUR helper for installing more software after setup
+yay-bin
