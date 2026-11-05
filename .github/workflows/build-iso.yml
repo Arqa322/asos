@@ -1,0 +1,63 @@
+name: Build ASOS ISO
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish as a GitHub release"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - name: Build ISO in Arch Linux container
+        run: ./build.sh --docker
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asos-iso
+          path: |
+            out/*.iso
+            out/*.sha256
+          compression-level: 0
+          retention-days: 7
+
+      # GitHub release assets are limited to 2 GiB per file -> split the ISO
+      - name: Split ISO for release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
+        run: |
+          cd out
+          sudo chown -R "$(id -u):$(id -g)" .
+          for iso in *.iso; do split -b 1900M -d -a 2 "$iso" "$iso.part"; done
+          ls -lh
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
+          name: ASOS ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build {0}', github.run_number) }}
+          body: |
+            Собрать ISO из частей:
+            - Linux/macOS: `f=$(ls asos-*.iso.sha256); iso=${f%.sha256}; cat "$iso".part* > "$iso" && sha256sum -c "$f"`
+            - Windows (cmd): `copy /b asos-ВЕРСИЯ-x86_64.iso.part00 + asos-ВЕРСИЯ-x86_64.iso.part01 + ... asos-ВЕРСИЯ-x86_64.iso`
+          files: |
+            out/*.iso.part*
+            out/*.sha256

@@ -1,0 +1,10 @@
+# Remove build-time hooks from the final image
+[Trigger]
+Operation = Install
+Type = Package
+Target = *
+
+[Action]
+Description = Removing ASOS build-time pacman hooks...
+When = PostTransaction
+Exec = /usr/bin/rm -f /etc/pacman.d/hooks/40-asos-locale-gen.hook /etc/pacman.d/hooks/zzzz99-asos-cleanup.hook

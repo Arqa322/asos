@@ -1,0 +1,1 @@
+# Domains that must NEVER be touched by zapret (one per line).

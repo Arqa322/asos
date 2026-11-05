@@ -1,0 +1,75 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 32,
+    "spacing": 6,
+    "modules-left": ["custom/launcher", "hyprland/workspaces", "hyprland/window"],
+    "modules-center": ["clock"],
+    "modules-right": [
+        "custom/zapret",
+        "hyprland/language",
+        "pulseaudio",
+        "network",
+        "cpu",
+        "memory",
+        "temperature",
+        "battery",
+        "tray",
+        "custom/power"
+    ],
+
+    "custom/launcher": {
+        "format": "  ",
+        "tooltip": false,
+        "on-click": "wofi --show drun"
+    },
+    "hyprland/workspaces": {
+        "format": "{id}",
+        "on-scroll-up": "hyprctl dispatch workspace e+1",
+        "on-scroll-down": "hyprctl dispatch workspace e-1"
+    },
+    "hyprland/window": { "max-length": 50, "separate-outputs": true },
+    "hyprland/language": { "format": "{short}" },
+    "clock": {
+        "format": "{:%H:%M  %a %d.%m}",
+        "tooltip-format": "<tt>{calendar}</tt>",
+        "locale": "ru_RU.UTF-8"
+    },
+    "custom/zapret": {
+        "exec": "asos-zapret waybar",
+        "return-type": "json",
+        "interval": 5,
+        "format": "{} zapret",
+        "on-click": "kitty --title asos-zapret -e asos-zapret menu",
+        "on-click-right": "sudo -n asos-zapret toggle || kitty -e sudo asos-zapret toggle"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰝟 mute",
+        "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
+        "on-click": "pavucontrol",
+        "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+    },
+    "network": {
+        "format-wifi": "  {signalStrength}%",
+        "format-ethernet": "󰈀 {ipaddr}",
+        "format-disconnected": "󰤭 offline",
+        "tooltip-format": "{ifname}: {ipaddr}/{cidr} via {gwaddr}",
+        "on-click": "kitty -e nmtui"
+    },
+    "cpu": { "format": " {usage}%", "interval": 3, "on-click": "kitty -e btop" },
+    "memory": { "format": " {percentage}%", "interval": 5 },
+    "temperature": { "critical-threshold": 85, "format": " {temperatureC}°C" },
+    "battery": {
+        "states": { "warning": 25, "critical": 10 },
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-icons": ["󰁺", "󰁼", "󰁾", "󰂀", "󰁹"]
+    },
+    "tray": { "spacing": 8 },
+    "custom/power": {
+        "format": "⏻",
+        "tooltip": false,
+        "on-click": "asos-power"
+    }
+}

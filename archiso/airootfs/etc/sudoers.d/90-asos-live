@@ -1,0 +1,3 @@
+# Live medium only: passwordless sudo for the live user.
+# asos-install removes this file on the installed system.
+asos ALL=(ALL:ALL) NOPASSWD: ALL

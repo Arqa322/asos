@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Установить ASOS на диск
+Comment=Установка live-системы ASOS на жёсткий диск
+Exec=kitty --title asos-install -e sudo asos-install
+Icon=system-software-install
+Terminal=false
+Type=Application
+Categories=System;

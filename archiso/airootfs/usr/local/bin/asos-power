@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Power menu for waybar / hotkeys
+choice=$(printf '%s\n' "  Заблокировать" "󰍃  Выйти из Hyprland" "  Перезагрузка" "⏻  Выключение" |
+	wofi --dmenu --prompt "Питание" --width 300 --height 220) || exit 0
+case "$choice" in
+	*Заблокировать*) hyprlock ;;
+	*Выйти*) hyprctl dispatch exit ;;
+	*Перезагрузка*) systemctl reboot ;;
+	*Выключение*) systemctl poweroff ;;
+esac

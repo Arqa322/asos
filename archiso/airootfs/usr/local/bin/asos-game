@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# asos-game — run a game/program with ASOS gaming defaults:
+#   gamemode (CPU governor, priorities) + MangoHud overlay (+ optional gamescope)
+# Steam launch options:   asos-game %command%
+# Without overlay:        ASOS_HUD=0 asos-game %command%
+# Through gamescope:      ASOS_GAMESCOPE="-W 1920 -H 1080 -r 144 -f" asos-game %command%
+set -euo pipefail
+[[ $# -gt 0 ]] || { echo "usage: asos-game <command> [args...]"; exit 1; }
+cmd=("$@")
+[[ "${ASOS_HUD:-1}" == 1 ]] && command -v mangohud >/dev/null && cmd=(mangohud "${cmd[@]}")
+command -v gamemoderun >/dev/null && cmd=(gamemoderun "${cmd[@]}")
+if [[ -n "${ASOS_GAMESCOPE:-}" ]] && command -v gamescope >/dev/null; then
+	# shellcheck disable=SC2206
+	gs=(gamescope $ASOS_GAMESCOPE --)
+	cmd=("${gs[@]}" "${cmd[@]}")
+fi
+# Wine/Proton: prefer ntsync, enable FSR in fullscreen
+export PROTON_USE_NTSYNC=1 WINE_FULLSCREEN_FSR="${WINE_FULLSCREEN_FSR:-1}"
+exec "${cmd[@]}"

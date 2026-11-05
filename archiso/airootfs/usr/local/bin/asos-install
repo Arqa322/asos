@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  asos-install — install the running ASOS live system to a disk
+#
+#  Copies the pristine live root filesystem (Hyprland, zapret, Atom game pack,
+#  office, sysadmin tools and all ASOS settings) to the selected disk, removes
+#  live-only tweaks, creates your user and installs a bootloader
+#  (systemd-boot on UEFI, GRUB on legacy BIOS).
+#
+#  WARNING: the selected disk is completely erased.
+# ============================================================================
+set -euo pipefail
+[[ $EUID -eq 0 ]] || exec sudo -- "$0" "$@"
+
+MNT=/mnt/asos-install
+SRC=/run/archiso/airootfs
+[[ -d "$SRC/usr" ]] || SRC=/
+UEFI=0; [[ -d /sys/firmware/efi/efivars ]] && UEFI=1
+TITLE="ASOS installer"
+
+die() { dialog --title "$TITLE" --msgbox "Ошибка: $*" 8 70 || true; clear; echo "error: $*" >&2; exit 1; }
+ask() { dialog --stdout --title "$TITLE" "$@"; }
+cleanup() { mountpoint -q "$MNT" && umount -R "$MNT" 2>/dev/null || true; }
+trap cleanup EXIT
+
+command -v dialog >/dev/null || { echo "dialog is required"; exit 1; }
+
+# ------------------------------------------------------------- questions ---
+# the device the live medium was booted from must not be offered
+LIVEDEV=""
+if src=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null); then
+	LIVEDEV=/dev/$(lsblk -no PKNAME "$src" 2>/dev/null | head -n1)
+	[[ "$LIVEDEV" == /dev/ ]] && LIVEDEV=$src
+fi
+items=()
+while read -r name size model; do
+	[[ -n "$name" && "$name" != "$LIVEDEV" ]] || continue
+	items+=("$name" "$size ${model:-disk}")
+done < <(lsblk -dpno NAME,SIZE,MODEL -e 7,11)
+[[ ${#items[@]} -gt 0 ]] || die "не найдено ни одного диска"
+DISK=$(ask --menu "Выберите диск для установки (ВСЕ ДАННЫЕ БУДУТ УДАЛЕНЫ):" 18 76 8 "${items[@]}") || exit 0
+
+FS=$(ask --menu "Файловая система корня:" 12 60 2 \
+	btrfs "Btrfs (подтома @, @home, @log, @pkg, сжатие zstd)" \
+	ext4 "ext4 (классика)") || exit 0
+
+HOSTNAME_=$(ask --inputbox "Имя компьютера:" 8 50 "asos") || exit 0
+USERNAME_=$(ask --inputbox "Имя пользователя (латиница, строчные):" 8 50 "user") || exit 0
+[[ "$USERNAME_" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "недопустимое имя пользователя: $USERNAME_"
+while true; do
+	PASS1=$(ask --insecure --passwordbox "Пароль для $USERNAME_ (также используется для sudo):" 8 60) || exit 0
+	PASS2=$(ask --insecure --passwordbox "Повторите пароль:" 8 60) || exit 0
+	[[ -n "$PASS1" && "$PASS1" == "$PASS2" ]] && break
+	dialog --title "$TITLE" --msgbox "Пароли пустые или не совпадают." 6 50
+done
+TZ_=$(ask --inputbox "Часовой пояс (например Europe/Moscow, Asia/Yekaterinburg):" 8 60 "Europe/Moscow") || exit 0
+[[ -f "/usr/share/zoneinfo/$TZ_" ]] || die "неизвестный часовой пояс: $TZ_"
+AUTOLOGIN=no
+ask --yesno "Автоматически входить в систему и запускать Hyprland\nбез ввода пароля (как в live-режиме)?" 8 60 && AUTOLOGIN=yes
+
+CONFIRM=$(ask --inputbox "ВНИМАНИЕ! Диск $DISK будет полностью стёрт.\nРежим загрузки: $([[ $UEFI == 1 ]] && echo UEFI || echo BIOS), ФС: $FS\n\nВведите YES для продолжения:" 12 60) || exit 0
+[[ "$CONFIRM" == "YES" ]] || die "установка отменена"
+clear
+
+# ------------------------------------------------------------ partition ---
+echo ":: Разметка $DISK"
+swapoff -a 2>/dev/null || true
+umount -R "$MNT" 2>/dev/null || true
+wipefs -af "$DISK"
+sgdisk --zap-all "$DISK"
+if [[ $UEFI == 1 ]]; then
+	sgdisk -n1:0:+1G -t1:ef00 -c1:ESP -n2:0:0 -t2:8304 -c2:ASOS "$DISK"
+else
+	sgdisk -n1:0:+1M -t1:ef02 -c1:BIOSBOOT -n2:0:+1G -t2:8300 -c2:BOOT -n3:0:0 -t3:8304 -c3:ASOS "$DISK"
+fi
+partprobe "$DISK" || true
+udevadm settle
+part() { lsblk -lnpo NAME,TYPE "$DISK" | awk '$2=="part"{print $1}' | sed -n "${1}p"; }
+if [[ $UEFI == 1 ]]; then BOOTP=$(part 1); ROOTP=$(part 2); else BOOTP=$(part 2); ROOTP=$(part 3); fi
+[[ -b "$BOOTP" && -b "$ROOTP" ]] || die "не удалось определить разделы на $DISK"
+
+echo ":: Форматирование"
+if [[ $UEFI == 1 ]]; then mkfs.fat -F32 -n ESP "$BOOTP"; else mkfs.ext4 -F -L BOOT "$BOOTP"; fi
+ROOTFLAGS=""
+mkdir -p "$MNT"
+if [[ "$FS" == btrfs ]]; then
+	mkfs.btrfs -f -L ASOS "$ROOTP"
+	mount "$ROOTP" "$MNT"
+	for sv in @ @home @log @pkg; do btrfs subvolume create "$MNT/$sv"; done
+	umount "$MNT"
+	opts="noatime,compress=zstd:1"
+	mount -o "$opts,subvol=@" "$ROOTP" "$MNT"
+	mkdir -p "$MNT"/{home,var/log,var/cache/pacman/pkg}
+	mount -o "$opts,subvol=@home" "$ROOTP" "$MNT/home"
+	mount -o "$opts,subvol=@log" "$ROOTP" "$MNT/var/log"
+	mount -o "$opts,subvol=@pkg" "$ROOTP" "$MNT/var/cache/pacman/pkg"
+	ROOTFLAGS="rootflags=subvol=@"
+else
+	mkfs.ext4 -F -L ASOS "$ROOTP"
+	mount "$ROOTP" "$MNT"
+fi
+mkdir -p "$MNT/boot"
+mount "$BOOTP" "$MNT/boot"
+
+# ----------------------------------------------------------------- copy ---
+echo ":: Копирование системы (это займёт несколько минут)"
+rsync -aAXH --info=progress2 \
+	--exclude='/dev/*' --exclude='/proc/*' --exclude='/sys/*' --exclude='/run/*' \
+	--exclude='/tmp/*' --exclude='/mnt/*' --exclude='/media/*' --exclude='/lost+found' \
+	--exclude='/boot/*' --exclude='/home/asos' --exclude='/etc/pacman.d/gnupg/*' \
+	"$SRC"/ "$MNT"/
+
+echo ":: Ядро"
+kver=$(ls "$MNT/usr/lib/modules" | grep -v extramodules | sort -V | tail -n1)
+if [[ -f "$MNT/usr/lib/modules/$kver/vmlinuz" ]]; then
+	install -m 0644 "$MNT/usr/lib/modules/$kver/vmlinuz" "$MNT/boot/vmlinuz-linux"
+elif [[ -f /run/archiso/bootmnt/arch/boot/x86_64/vmlinuz-linux ]]; then
+	install -m 0644 /run/archiso/bootmnt/arch/boot/x86_64/vmlinuz-linux "$MNT/boot/vmlinuz-linux"
+fi
+
+# ------------------------------------------------- remove live-only bits ---
+echo ":: Настройка установленной системы"
+rm -f "$MNT/etc/mkinitcpio.conf.d/archiso.conf" \
+	"$MNT/etc/systemd/system/getty@tty1.service.d/autologin.conf" \
+	"$MNT/etc/sudoers.d/90-asos-live" \
+	"$MNT/etc/systemd/system/etc-pacman.d-gnupg.mount" \
+	"$MNT/etc/systemd/system/pacman-init.service" \
+	"$MNT/etc/systemd/system/multi-user.target.wants/pacman-init.service" \
+	"$MNT/etc/systemd/system/asos-live-setup.service" \
+	"$MNT/etc/systemd/system/multi-user.target.wants/asos-live-setup.service" \
+	"$MNT/etc/systemd/journald.conf.d/volatile-storage.conf" \
+	"$MNT/etc/systemd/logind.conf.d/do-not-suspend.conf"
+
+if [[ $AUTOLOGIN == yes ]]; then
+	mkdir -p "$MNT/etc/systemd/system/getty@tty1.service.d"
+	cat >"$MNT/etc/systemd/system/getty@tty1.service.d/autologin.conf" <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin $USERNAME_ - \$TERM
+EOF
+fi
+
+cat >"$MNT/etc/mkinitcpio.d/linux.preset" <<'EOF'
+# mkinitcpio preset file for the 'linux' package
+ALL_kver="/boot/vmlinuz-linux"
+PRESETS=('default' 'fallback')
+default_image="/boot/initramfs-linux.img"
+fallback_image="/boot/initramfs-linux-fallback.img"
+fallback_options="-S autodetect"
+EOF
+
+genfstab -U "$MNT" >"$MNT/etc/fstab"
+echo "$HOSTNAME_" >"$MNT/etc/hostname"
+cat >"$MNT/etc/hosts" <<EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   $HOSTNAME_.localdomain $HOSTNAME_
+EOF
+ln -sf "/usr/share/zoneinfo/$TZ_" "$MNT/etc/localtime"
+rm -f "$MNT/etc/machine-id"
+
+ROOT_UUID=$(blkid -s UUID -o value "$ROOTP")
+CMDLINE="root=UUID=$ROOT_UUID rw $ROOTFLAGS quiet splash loglevel=3"
+
+# ---------------------------------------------------------------- chroot ---
+cat >"$MNT/root/asos-chroot.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+systemd-machine-id-setup
+hwclock --systohc || true
+locale-gen
+pacman-key --init
+pacman-key --populate archlinux
+userdel -r asos 2>/dev/null || true
+groupdel asos 2>/dev/null || true
+useradd -m -s /bin/bash "$USERNAME_"
+asos-user-groups "$USERNAME_"
+passwd -l root
+mkinitcpio -P
+if [[ $UEFI == 1 ]]; then
+	bootctl install --esp-path=/boot
+	mkdir -p /boot/loader/entries
+	cat >/boot/loader/loader.conf <<EOT
+default asos.conf
+timeout 3
+console-mode max
+editor no
+EOT
+	cat >/boot/loader/entries/asos.conf <<EOT
+title   ASOS (Arch Linux + Hyprland)
+linux   /vmlinuz-linux
+initrd  /initramfs-linux.img
+options $CMDLINE
+EOT
+	cat >/boot/loader/entries/asos-fallback.conf <<EOT
+title   ASOS (fallback initramfs)
+linux   /vmlinuz-linux
+initrd  /initramfs-linux-fallback.img
+options $CMDLINE
+EOT
+	systemctl enable systemd-boot-update.service || true
+else
+	sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT="$ROOTFLAGS quiet splash loglevel=3"|' /etc/default/grub
+	sed -i 's|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR="ASOS"|' /etc/default/grub
+	grub-install --target=i386-pc "$DISK"
+	grub-mkconfig -o /boot/grub/grub.cfg
+fi
+systemctl enable NetworkManager.service bluetooth.service zapret.service power-profiles-daemon.service systemd-timesyncd.service fstrim.timer || true
+EOF
+chmod +x "$MNT/root/asos-chroot.sh"
+arch-chroot "$MNT" /root/asos-chroot.sh
+echo "$USERNAME_:$PASS1" | arch-chroot "$MNT" chpasswd
+rm -f "$MNT/root/asos-chroot.sh"
+sync
+
+dialog --title "$TITLE" --msgbox "Установка завершена!\n\nДиск: $DISK\nПользователь: $USERNAME_\n\nИзвлеките установочный носитель и перезагрузитесь." 11 60
+clear
+echo "ASOS installed to $DISK. Reboot to start."

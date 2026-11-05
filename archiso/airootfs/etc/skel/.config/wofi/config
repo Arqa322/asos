@@ -1,0 +1,8 @@
+width=600
+height=420
+show=drun
+prompt=Поиск...
+allow_images=true
+image_size=28
+insensitive=true
+term=kitty

@@ -1,0 +1,30 @@
+ ASOS — горячие клавиши Hyprland          (q — закрыть)
+ ===========================================================
+ SUPER + Enter          терминал (kitty)
+ SUPER + D              меню приложений (wofi)
+ SUPER + Q              закрыть окно
+ SUPER + F              полноэкранный режим
+ SUPER + V              плавающее окно
+ SUPER + E              файловый менеджер (Thunar)
+ SUPER + B              браузер (Firefox)
+ SUPER + O              LibreOffice
+ SUPER + Z              меню zapret (стратегии, game filter, Atom)
+ SUPER + C              история буфера обмена
+ SUPER + L              заблокировать экран
+ SUPER + Esc            системный монитор (btop)
+ SUPER + Shift + S      скриншот области (с редактором)
+ Print                  скриншот экрана в буфер
+ SUPER + 1..0           рабочие столы
+ SUPER + Shift + 1..0   перенести окно на рабочий стол
+ SUPER + стрелки        фокус;  + Shift — переместить окно
+ SUPER + ЛКМ / ПКМ      двигать / менять размер окна
+ SUPER + Shift + E      выйти из Hyprland
+ Alt + Shift            раскладка EN/RU
+
+ Терминал
+ -----------------------------------------------------------
+ asos-zapret            статус zapret (menu, list, set, game, ipset, atom, check)
+ asos-game <cmd>        запуск игры с gamemode + MangoHud
+                        (в Steam: asos-game %command%)
+ sudo asos-install      установка ASOS на диск
+ btop / htop / glances  мониторинг

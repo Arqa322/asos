@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Greeting notification shown at Hyprland start
+sleep 2
+if grep -q archisobasedir /proc/cmdline; then
+	notify-send -a ASOS -t 15000 "Добро пожаловать в ASOS (live)" \
+"Пользователь: asos / пароль: asos
+SUPER+Enter — терминал, SUPER+D — приложения
+SUPER+Z — zapret, SUPER+F1 — горячие клавиши
+Установка на диск: sudo asos-install"
+else
+	[[ -f ~/.cache/asos-welcome-shown ]] && exit 0
+	mkdir -p ~/.cache && touch ~/.cache/asos-welcome-shown
+	notify-send -a ASOS -t 15000 "Добро пожаловать в ASOS" \
+"SUPER+D — приложения, SUPER+Z — zapret, SUPER+F1 — горячие клавиши"
+fi

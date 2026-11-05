@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Zapret (обход DPI)
+Comment=Стратегии Flowseal, Game Filter, Atom game pack
+Exec=kitty --title asos-zapret -e asos-zapret menu
+Icon=network-vpn
+Terminal=false
+Type=Application
+Categories=Network;System;
