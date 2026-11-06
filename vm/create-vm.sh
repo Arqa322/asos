@@ -44,6 +44,56 @@ vbox_try() { # what, then variants separated by "--or"
 	warn "не удалось включить: $what (не критично)"
 }
 
+# ------------------------------------------------ start with diagnostics
+vm_state() { VBoxManage showvminfo "$1" --machinereadable 2>/dev/null | sed -n 's/^VMState="\(.*\)"$/\1/p'; }
+vm_log_errors() {
+	local cfg dir f
+	cfg=$(VBoxManage showvminfo "$1" --machinereadable 2>/dev/null | sed -n 's/^CfgFile="\(.*\)"$/\1/p')
+	dir="$(dirname "$cfg")/Logs"
+	for f in VBox.log VBoxHardening.log; do
+		[[ -f "$dir/$f" ]] && tail -n 600 "$dir/$f" | grep -E 'VERR_|error|failed|denied' | tail -n 12 | sed 's/^/  /'
+	done
+	return 0
+}
+START_OUT=""
+try_start() { START_OUT=$(VBoxManage startvm "$1" --type gui 2>&1); }
+start_vm() {
+	local vm=$1 state all
+	state=$(vm_state "$vm")
+	case "$state" in running|paused|starting|restoring)
+		info "ВМ \"$vm\" уже запущена (состояние: $state)"; ALREADY_RUNNING=1; return 0 ;;
+	esac
+	try_start "$vm" && return 0
+	all="$START_OUT"$'\n'"$(vm_log_errors "$vm")"
+	if grep -Eq 'VERR_VMX_MSR_ALL_VMX_DISABLED|VERR_VMX_MSR_VMX_DISABLED|VERR_SVM_DISABLED|VERR_VMX_NO_VMX|VERR_SVM_NO_SVM|VT-x is (disabled|not available)|AMD-V is (disabled|not available)' <<<"$all"; then
+		echo "$START_OUT"; die "в BIOS/UEFI выключена аппаратная виртуализация: включите Intel VT-x или AMD SVM"
+	fi
+	if grep -Eq 'VERR_VM_DRIVER|VERR_SUPDRV_|VERR_SUPLIB_|vboxdrv' <<<"$all"; then
+		echo "$START_OUT"
+		die "не загружен драйвер VirtualBox: Linux — sudo /sbin/vboxconfig (или sudo modprobe vboxdrv; при Secure Boot подпишите модуль), macOS — разрешите расширение Oracle в «Конфиденциальность и безопасность»"
+	fi
+	if grep -Eq 'KVM|kvm.*(busy|in use)|VERR_VMX_IN_VMX_ROOT_MODE|VERR_SVM_IN_USE' <<<"$all"; then
+		echo "$START_OUT"; die "процессор занят другим гипервизором (KVM/QEMU): закройте другие ВМ или выполните sudo modprobe -r kvm_intel kvm_amd"
+	fi
+	if grep -Eq 'USB|EHCI|XHCI|xHCI|Extension Pack' <<<"$all"; then
+		warn "ВМ не запустилась, пробую без USB 3.0"
+		vbox_try "отключение USB 3.0" modifyvm "$vm" --usb-xhci off --or modifyvm "$vm" --usbxhci off
+		try_start "$vm" && { warn "ВМ запущена без USB 3.0"; return 0; }
+	fi
+	warn "ВМ не запустилась, пробую без звука"
+	vbox_try "отключение звука" modifyvm "$vm" --audio-enabled off --or modifyvm "$vm" --audio none
+	try_start "$vm" && { warn "ВМ запущена без звука"; return 0; }
+	warn "ВМ не запустилась, пробую без 3D-ускорения"
+	vbox_try "отключение 3D" modifyvm "$vm" --accelerate-3d off --or modifyvm "$vm" --accelerate3d off
+	if try_start "$vm"; then
+		warn "ВМ запущена без 3D-ускорения: Hyprland в ВМ работать не будет (консоль и установка — будут)"
+		return 0
+	fi
+	echo; echo "Вывод VirtualBox:"; echo "$START_OUT"
+	echo "Ошибки из журнала ВМ:"; vm_log_errors "$vm"
+	die "ВМ не запускается — пришлите текст выше (от строки «Вывод VirtualBox»)"
+}
+
 command -v VBoxManage >/dev/null || die "VBoxManage не найден — установлен ли VirtualBox?"
 info "VirtualBox $(VBoxManage --version)"
 
@@ -76,8 +126,13 @@ cap=$(( ram * 6 / 10 / 256 * 256 ))
 info "хост: $cores физ. ядер, $ram МБ ОЗУ  ->  ВМ: $CPUS ядра, $MEM МБ ОЗУ, диск $DISK ГБ (SATA)"
 
 # ------------------------------------------------------------ create VM
-if VBoxManage list vms | grep -q "^\"$NAME\" "; then
-	[[ $RECREATE == 1 ]] || die "ВМ \"$NAME\" уже существует. Другое имя: --name ASOS2, пересоздать: --recreate (диск ВМ будет удалён)"
+START_EXISTING=0 ALREADY_RUNNING=0
+if VBoxManage list vms | grep -q "^\"$NAME\" " && [[ $RECREATE == 0 ]]; then
+	info "ВМ \"$NAME\" уже существует (пересоздать с нуля: --recreate, другая ВМ: --name ASOS2)"
+	read -rp "Запустить существующую ВМ \"$NAME\"? [Y/n] " a
+	[[ -z "$a" || "$a" =~ ^[YyДд] ]] || die "отменено"
+	START_EXISTING=1
+elif VBoxManage list vms | grep -q "^\"$NAME\" "; then
 	read -rp "Удалить существующую ВМ \"$NAME\" вместе с диском? Введите YES: " a
 	[[ "$a" == YES ]] || die "отменено"
 	VBoxManage controlvm "$NAME" poweroff >/dev/null 2>&1 || true
@@ -85,44 +140,53 @@ if VBoxManage list vms | grep -q "^\"$NAME\" "; then
 	VBoxManage unregistervm "$NAME" --delete
 fi
 
-base=$(VBoxManage list systemproperties | sed -n 's/^Default machine folder:[[:space:]]*//p')
-VDI="$base/$NAME/$NAME.vdi"
+if [[ $START_EXISTING == 0 ]]; then
+	base=$(VBoxManage list systemproperties | sed -n 's/^Default machine folder:[[:space:]]*//p')
+	VDI="$base/$NAME/$NAME.vdi"
 
-created=0
-for os in ArchLinux_64 ArchLinux_x64 Linux_64 Linux_x64; do
-	if VBoxManage createvm --name "$NAME" --ostype "$os" --register >/dev/null 2>&1; then created=1; info "тип ОС: $os"; break; fi
-done
-[[ $created == 1 ]] || die "не удалось создать ВМ"
+	created=0
+	for os in ArchLinux_64 ArchLinux_x64 Linux_64 Linux_x64; do
+		if VBoxManage createvm --name "$NAME" --ostype "$os" --register >/dev/null 2>&1; then created=1; info "тип ОС: $os"; break; fi
+	done
+	[[ $created == 1 ]] || die "не удалось создать ВМ"
 
-VBoxManage modifyvm "$NAME" --cpus "$CPUS" --memory "$MEM" --vram 128 --graphicscontroller vmsvga \
-	--firmware efi --ioapic on --nic1 nat --boot1 dvd --boot2 disk --boot3 none --boot4 none
-vbox_try "часы в UTC" modifyvm "$NAME" --rtc-use-utc on --or modifyvm "$NAME" --rtcuseutc on
-vbox_try "3D-ускорение (нужно для Hyprland)" modifyvm "$NAME" --accelerate-3d on --or modifyvm "$NAME" --accelerate3d on
-vbox_try "паравиртуализация KVM" modifyvm "$NAME" --paravirt-provider kvm --or modifyvm "$NAME" --paravirtprovider kvm
-vbox_try "звук" modifyvm "$NAME" --audio-enabled on --audio-out on --audio-in on --or modifyvm "$NAME" --audioout on
-vbox_try "общий буфер обмена" modifyvm "$NAME" --clipboard-mode bidirectional --or modifyvm "$NAME" --clipboard bidirectional
-vbox_try "drag'n'drop" modifyvm "$NAME" --drag-and-drop bidirectional --or modifyvm "$NAME" --draganddrop bidirectional
-vbox_try "USB 3.0 (xHCI)" modifyvm "$NAME" --usb-xhci on --or modifyvm "$NAME" --usbxhci on --or modifyvm "$NAME" --usb-ohci on
-vbox_try "планшетная мышь" modifyvm "$NAME" --mouse usbtablet
+	VBoxManage modifyvm "$NAME" --cpus "$CPUS" --memory "$MEM" --vram 128 --graphicscontroller vmsvga \
+		--firmware efi --ioapic on --nic1 nat --boot1 dvd --boot2 disk --boot3 none --boot4 none
+	vbox_try "часы в UTC" modifyvm "$NAME" --rtc-use-utc on --or modifyvm "$NAME" --rtcuseutc on
+	vbox_try "3D-ускорение (нужно для Hyprland)" modifyvm "$NAME" --accelerate-3d on --or modifyvm "$NAME" --accelerate3d on
+	vbox_try "паравиртуализация KVM" modifyvm "$NAME" --paravirt-provider kvm --or modifyvm "$NAME" --paravirtprovider kvm
+	vbox_try "звук" modifyvm "$NAME" --audio-enabled on --audio-out on --audio-in on --or modifyvm "$NAME" --audioout on
+	vbox_try "общий буфер обмена" modifyvm "$NAME" --clipboard-mode bidirectional --or modifyvm "$NAME" --clipboard bidirectional
+	vbox_try "drag'n'drop" modifyvm "$NAME" --drag-and-drop bidirectional --or modifyvm "$NAME" --draganddrop bidirectional
+	vbox_try "USB 3.0 (xHCI)" modifyvm "$NAME" --usb-xhci on --or modifyvm "$NAME" --usbxhci on --or modifyvm "$NAME" --usb-ohci on
+	vbox_try "планшетная мышь" modifyvm "$NAME" --mouse usbtablet
 
-info "диск $DISK ГБ (VDI, динамический) на контроллере SATA/AHCI"
-VBoxManage createmedium disk --filename "$VDI" --size $(( DISK * 1024 )) --format VDI >/dev/null
-VBoxManage storagectl "$NAME" --name SATA --add sata --controller IntelAhci --portcount 2 --hostiocache on --bootable on
-VBoxManage storageattach "$NAME" --storagectl SATA --port 0 --device 0 --type hdd --medium "$VDI" --nonrotational on --discard on
-VBoxManage storageattach "$NAME" --storagectl SATA --port 1 --device 0 --type dvddrive --medium "$ISO"
+	info "диск $DISK ГБ (VDI, динамический) на контроллере SATA/AHCI"
+	VBoxManage createmedium disk --filename "$VDI" --size $(( DISK * 1024 )) --format VDI >/dev/null
+	VBoxManage storagectl "$NAME" --name SATA --add sata --controller IntelAhci --portcount 2 --hostiocache on --bootable on
+	VBoxManage storageattach "$NAME" --storagectl SATA --port 0 --device 0 --type hdd --medium "$VDI" --nonrotational on --discard on
+	VBoxManage storageattach "$NAME" --storagectl SATA --port 1 --device 0 --type dvddrive --medium "$ISO"
 
-[[ "$(uname)" == Linux ]] && ! id -nG | grep -qw vboxusers && warn "добавьте себя в группу vboxusers для проброса USB: sudo usermod -aG vboxusers ${USER:-$(id -un)}"
+	[[ "$(uname)" == Linux ]] && ! id -nG | grep -qw vboxusers && warn "добавьте себя в группу vboxusers для проброса USB: sudo usermod -aG vboxusers ${USER:-$(id -un)}"
+fi
 
 info "запуск ВМ"
-VBoxManage startvm "$NAME" --type gui
+start_vm "$NAME"
 
 echo
 echo "Команда установщика ASOS для консоли Arch live:"
 echo "  $INSTALL_CMD"
 echo
-if [[ $AUTOTYPE == 1 && "$(basename "$ISO")" == archlinux-* ]]; then
-	read -rp "Ввести её в ВМ автоматически через $WAIT с (после загрузки live-системы)? [Y/n] " a
-	if [[ -z "$a" || "$a" =~ ^[YyДд] ]]; then
+if [[ $AUTOTYPE == 1 && $ALREADY_RUNNING == 0 && "$(basename "$ISO")" == archlinux-* ]]; then
+	go=0
+	if [[ $START_EXISTING == 1 ]]; then
+		read -rp "Ввести команду установщика в ВМ через $WAIT с? Только если ВМ загружается с ISO Arch [y/N] " a
+		[[ "$a" =~ ^[YyДд] ]] && go=1
+	else
+		read -rp "Ввести её в ВМ автоматически через $WAIT с (после загрузки live-системы)? [Y/n] " a
+		[[ -z "$a" || "$a" =~ ^[YyДд] ]] && go=1
+	fi
+	if [[ $go == 1 ]]; then
 		for (( i = WAIT; i > 0; i -= 5 )); do printf '\r  ожидание загрузки: %3d с ' "$i"; sleep 5; done; echo
 		VBoxManage controlvm "$NAME" keyboardputstring "$INSTALL_CMD"
 		VBoxManage controlvm "$NAME" keyboardputscancode 1c 9c
