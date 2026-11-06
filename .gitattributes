@@ -1,0 +1,5 @@
+# keep LF for shell scripts everywhere (also in Windows checkouts); PowerShell gets CRLF
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.bin binary

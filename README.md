@@ -21,6 +21,7 @@ scripts/fetch-zapret.sh     загрузка nfqws (bol-van/zapret) и стра�
 scripts/build-aur.sh        сборка AUR-пакетов (Arduino IDE, rkdeveloptool …) в локальный репозиторий
 scripts/fetch-arduino.sh    предустановка ядер и библиотек Arduino в /etc/skel
 scripts/check-packages.py   проверка списков пакетов по актуальным репозиториям Arch (без сборки)
+scripts/install-online.sh   установка ASOS с официального ISO Arch (без сборки образа)
 archiso/                    профиль archiso
   profiledef.sh             параметры образа
   packages.x86_64           список пакетов (разбит по категориям)
@@ -35,6 +36,7 @@ archiso/                    профиль archiso
     usr/local/bin/          asos-zapret, asos-arduino, asos-nanopi, asos-install, asos-game …
     usr/share/asos/atom/    Atom game pack: hostlist + ipset игр
     usr/share/asos/embedded/ toolchain-файлы aarch64 и примеры
+vm/                         создание ВМ VirtualBox (Windows PowerShell / bash)
 .github/workflows/          сборка ISO в GitHub Actions
 ```
 
@@ -170,6 +172,49 @@ asos-nanopi menu                     # то же в TUI (SUPER+Shift+N)
 Кросс-компиляция: `aarch64-linux-gnu-gcc`, toolchain-файлы `/usr/share/asos/embedded/aarch64-linux-gnu.{cmake,meson}`,
 готовый пример `/usr/share/asos/embedded/examples/nanopi-hello` (`./deploy.sh pi@nanopi.local`).
 Примеры описаны в `/usr/share/asos/embedded/examples/README.md`.
+
+## Установка с официального ISO Arch (без сборки ASOS ISO)
+
+Скрипт `scripts/install-online.sh` ставит Arch Linux сразу со всеми настройками ASOS: пакеты всех групп
+из `archiso/packages.x86_64`, конфиги, zapret + Flowseal, AUR-пакеты (Arduino IDE и др.), ядро Arduino AVR.
+Группы ставятся по очереди с очисткой кэша, Btrfs со сжатием — поэтому хватает диска 20 ГБ.
+В виртуальной машине автоматически добавляются гостевые дополнения и настройки курсора для Hyprland.
+
+Загрузитесь с официального `archlinux-*.iso` и в консоли live-системы выполните:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh
+bash i.sh
+```
+
+Установщик спросит диск, файловую систему, имя компьютера, пользователя, пароль, часовой пояс и автовход.
+
+## Виртуальная машина VirtualBox
+
+`vm/create-vm.ps1` (Windows) и `vm/create-vm.sh` (Linux/macOS) создают и запускают ВМ:
+до 4 ядер и до 8 ГБ ОЗУ (не больше, чем позволяет ПК), диск 20 ГБ на контроллере **SATA/AHCI** (не NVMe),
+EFI, VMSVGA с 3D-ускорением (нужно Hyprland), NAT, USB 3.0 для Arduino/NanoPi, общий буфер обмена.
+ISO берётся из «Загрузок» (`asos-*.iso`, затем `archlinux-*.iso`, затем самый новый `.iso`).
+Для официального ISO Arch скрипт может сам ввести в ВМ команду установщика.
+
+Windows (PowerShell):
+
+```powershell
+cd $env:USERPROFILE\Downloads
+Invoke-WebRequest https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/vm/create-vm.ps1 -OutFile create-vm.ps1 -UseBasicParsing
+powershell -ExecutionPolicy Bypass -File .\create-vm.ps1
+```
+
+Linux/macOS:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/vm/create-vm.sh
+bash create-vm.sh
+```
+
+Параметры: `-Iso <путь>`, `-Name`, `-Cpus`, `-MemoryMB`, `-DiskGB`, `-BootWaitSeconds`, `-NoAutoType`, `-Recreate`
+(в bash-версии — `--iso`, `--name`, `--cpus`, `--memory`, `--disk`, `--boot-wait`, `--no-autotype`, `--recreate`).
+Существующая ВМ с тем же именем не трогается без `-Recreate` и подтверждения.
 
 ## Установка на диск
 
