@@ -97,7 +97,11 @@ jobs:
           echo "$out"
           if echo "$out" | grep -q -E 'WARN|ERROR'; then echo "::error::starship reported a config problem"; exit 1; fi
       - name: sway --validate (safe graphics mode)
-        run: su tester -c 'sway --validate -c /usr/share/asos/sway/config'
+        # the packaged binary carries file capabilities, which an unprivileged
+        # container refuses to exec; a plain copy is enough to parse the config
+        run: |
+          cp "$(command -v sway)" /usr/local/bin/sway-nocap
+          su tester -c 'sway-nocap --validate -c /usr/share/asos/sway/config'
 
   build:
     needs: check
