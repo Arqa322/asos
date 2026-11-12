@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  asos-doctor — graphics / session diagnostics for ASOS
+#  Prints a short verdict and writes a full report to ~/asos-doctor.txt
+#  (works from a text console: Ctrl+Alt+F2, in VirtualBox: Host key + F2)
+# ============================================================================
+set -uo pipefail
+OUT="${1:-$HOME/asos-doctor.txt}"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/asos/session"
+RT="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+g=$'\e[32m'; y=$'\e[33m'; r=$'\e[31m'; b=$'\e[1m'; n=$'\e[0m'
+
+section() { printf '\n===== %s =====\n' "$1"; }
+{
+	echo "ASOS doctor report — $(date '+%F %T')"
+	section "system";        uname -a; cat /etc/os-release 2>/dev/null | grep -E '^(NAME|BUILD_ID|VERSION)='
+	section "virtualisation"; systemd-detect-virt 2>/dev/null || true
+	section "kernel cmdline"; cat /proc/cmdline
+	section "GPU";           lspci -nnk 2>/dev/null | grep -A3 -E 'VGA|3D|Display' || true
+	section "/dev/dri";      ls -l /dev/dri 2>/dev/null || echo "no /dev/dri — no DRM driver loaded"
+	section "groups";        id
+	section "packages";      pacman -Q hyprland aquamarine mesa sway virtualbox-guest-utils 2>/dev/null || true
+	section "EGL (GBM)";     EGL_PLATFORM=surfaceless eglinfo -B -p gbm 2>&1 | head -40 || echo "eglinfo failed"
+	section "kernel DRM messages"; journalctl -k -b --no-pager 2>/dev/null | grep -i -E 'drm|vmwgfx|svga|virtio.gpu|vboxvideo|amdgpu|i915|nouveau' | tail -40 || true
+	section "asos-session"; asos-session --status 2>/dev/null; tail -n 30 "$STATE/session.log" 2>/dev/null || true
+	for f in "$STATE"/*.log; do
+		[[ -f "$f" && "$(basename "$f")" != session.log ]] || continue
+		section "session mode log: $(basename "$f")"; grep -v '^\s*$' "$f" | tail -n 40
+	done
+	section "Hyprland logs"
+	for f in $(ls -t "$RT"/hypr/*/hyprland.log 2>/dev/null | head -n 2); do echo "--- $f"; grep -i -E 'err|crit|fail|warn' "$f" | tail -n 40; done
+	section "Hyprland crash reports"
+	for f in $(ls -t ~/.cache/hyprland/hyprlandCrashReport*.txt ~/.local/share/hyprland/hyprlandCrashReport*.txt 2>/dev/null | head -n 1); do
+		echo "--- $f"; head -n 60 "$f"
+	done
+} >"$OUT" 2>&1
+
+# ------------------------------------------------------------ verdict ---
+virt=$(systemd-detect-virt --vm 2>/dev/null || echo none)
+echo "${b}ASOS doctor${n}   (полный отчёт: $OUT)"
+echo "  виртуализация: $virt"
+gpu=$(lspci -nnk 2>/dev/null | grep -A3 -E 'VGA|3D|Display' | sed -n 's/.*Kernel driver in use: //p' | head -n1)
+echo "  видеодрайвер:  ${gpu:-не найден}"
+renderer=$(EGL_PLATFORM=surfaceless eglinfo -B -p gbm 2>/dev/null | sed -n 's/^OpenGL ES profile renderer: //p;s/^OpenGL core profile renderer: //p' | head -n1)
+if [[ -z "$renderer" ]]; then
+	echo "  3D (GBM/EGL):  ${r}нет${n} — Hyprland работать не сможет, будет безопасный режим sway"
+elif [[ "$renderer" == *llvmpipe* || "$renderer" == *softpipe* ]]; then
+	echo "  3D (GBM/EGL):  ${y}только программная отрисовка ($renderer)${n}"
+else
+	echo "  3D (GBM/EGL):  ${g}$renderer${n}"
+fi
+last=$(cat "$STATE/last-ok" 2>/dev/null || true)
+echo "  рабочий режим сеанса: ${last:-ещё не определён}"
+
+if [[ "$virt" == oracle ]]; then
+	echo
+	if [[ -z "$renderer" || "$renderer" == *llvmpipe* ]]; then
+		echo "  ${y}VirtualBox без 3D-ускорения.${n} Выключите ВМ → Настроить → Дисплей:"
+		echo "    графический контроллер VMSVGA, видеопамять 128 МБ, «Включить 3D-ускорение»."
+		echo "    Если галочка неактивна или ВМ с ней не стартует — обновите VirtualBox и драйвер видеокарты ПК."
+	fi
+	echo "  Hyprland официально не поддерживает работу в ВМ; надёжнее всего он работает в VMware"
+	echo "  Workstation (3D-ускорение) и QEMU/KVM с virtio-gpu + virgl. Безопасный режим sway работает везде."
+fi
+echo
+echo "  Сменить режим: asos-session --set <hyprland-vm|hyprland-legacy|hyprland-software|sway-software>,"
+echo "  вернуть автовыбор: asos-session --reset. Затем выйдите из сеанса (или: sudo systemctl restart getty@tty1)."

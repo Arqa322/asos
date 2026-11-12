@@ -4,7 +4,7 @@ choice=$(printf '%s\n' "  Заблокировать" "󰍃  Выйти из Hyp
 	wofi --dmenu --prompt "Питание" --width 300 --height 220) || exit 0
 case "$choice" in
 	*Заблокировать*) hyprlock ;;
-	*Выйти*) hyprctl dispatch exit ;;
+	*Выйти*) if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then hyprctl dispatch 'hl.dsp.exit()'; else swaymsg exit; fi ;;
 	*Перезагрузка*) systemctl reboot ;;
 	*Выключение*) systemctl poweroff ;;
 esac

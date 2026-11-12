@@ -6,10 +6,12 @@
 #
 #  usage: ./create-vm.sh [--iso PATH] [--name ASOS] [--cpus 4] [--memory 8192]
 #                        [--disk 20] [--boot-wait 90] [--no-autotype] [--recreate]
+#         ./create-vm.sh --type-update   # type the ASOS update command into the running VM
 # ============================================================================
 set -euo pipefail
 
-NAME=ASOS CPUS=4 MEM=8192 DISK=20 ISO="" WAIT=90 AUTOTYPE=1 RECREATE=0
+NAME=ASOS CPUS=4 MEM=8192 DISK=20 ISO="" WAIT=90 AUTOTYPE=1 RECREATE=0 TYPE_UPDATE=0
+UPDATE_CMD="curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash"
 INSTALL_CMD="curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh && bash i.sh"
 
 while [[ $# -gt 0 ]]; do
@@ -22,6 +24,7 @@ while [[ $# -gt 0 ]]; do
 		--boot-wait) WAIT=$2; shift 2 ;;
 		--no-autotype) AUTOTYPE=0; shift ;;
 		--recreate) RECREATE=1; shift ;;
+		--type-update) TYPE_UPDATE=1; shift ;;
 		-h|--help) sed -n '2,10p' "$0"; exit 0 ;;
 		*) echo "unknown option $1" >&2; exit 1 ;;
 	esac
@@ -96,6 +99,16 @@ start_vm() {
 
 command -v VBoxManage >/dev/null || die "VBoxManage не найден — установлен ли VirtualBox?"
 info "VirtualBox $(VBoxManage --version)"
+
+# --type-update: type the ASOS update command into an already running VM
+# (log in on a text console first: Host key + F2 in the VM window)
+if [[ $TYPE_UPDATE == 1 ]]; then
+	[[ "$(vm_state "$NAME")" == running ]] || die "ВМ \"$NAME\" не запущена"
+	VBoxManage controlvm "$NAME" keyboardputstring "$UPDATE_CMD"
+	VBoxManage controlvm "$NAME" keyboardputscancode 1c 9c
+	info "команда обновления введена в ВМ \"$NAME\". Введите в ВМ пароль пользователя для sudo."
+	exit 0
+fi
 
 # ---------------------------------------------------------------- the ISO
 if [[ -z "$ISO" ]]; then

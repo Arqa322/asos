@@ -35,3 +35,5 @@ window#waybar {
 #battery.critical  { color: #f38ba8; }
 #temperature.critical { color: #f38ba8; }
 #custom-power { color: #f38ba8; margin-right: 6px; }
+
+#custom-safe { color: #1e1e2e; background: #f9e2af; padding: 0 10px; margin: 4px 0; border-radius: 6px; }

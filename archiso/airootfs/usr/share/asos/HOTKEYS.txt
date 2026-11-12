@@ -21,7 +21,8 @@
  SUPER + Shift + 1..0   перенести окно на рабочий стол
  SUPER + стрелки        фокус;  + Shift — переместить окно
  SUPER + ЛКМ / ПКМ      двигать / менять размер окна
- SUPER + Shift + E      выйти из Hyprland
+ SUPER + Backspace      меню питания (блокировка, выход, перезагрузка)
+ SUPER + Shift + E      выйти из сеанса
  Alt + Shift            раскладка EN/RU
 
  Терминал
@@ -32,5 +33,7 @@
  asos-arduino           Arduino: doctor, boards, upload, monitor, setup esp32 ...
  asos-nanopi            NanoPi: boards, find, console, flash, share, chroot ...
  pio                    PlatformIO Core;  esptool / mpremote — ESP32 и MicroPython
+ asos-doctor            диагностика графики (почему не запускается Hyprland)
+ asos-session --set M   режим графики: hyprland-vm | hyprland-software | sway-software
  sudo asos-install      установка ASOS на диск
  btop / htop / glances  мониторинг

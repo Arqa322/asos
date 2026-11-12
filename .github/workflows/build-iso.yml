@@ -1,6 +1,10 @@
 name: Build ASOS ISO
 
 on:
+  push:
+    branches: ["claude/**", "main"]
+    paths: ["archiso/**", "scripts/**", "vm/**", "build.sh", ".github/workflows/**"]
+    tags: ["v*"]
   pull_request:
     paths: ["archiso/**", "scripts/**", "vm/**", "build.sh", ".github/workflows/**"]
   workflow_dispatch:
@@ -9,8 +13,6 @@ on:
         description: "Publish as a GitHub release"
         type: boolean
         default: false
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: write
@@ -34,10 +36,15 @@ jobs:
           if ($e.Count) { $e | ForEach-Object { Write-Error ("{0}:{1} {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message) }; exit 1 }
       - name: Validate package lists against Arch repositories
         run: python3 scripts/check-packages.py
+      - name: Validate hyprland.lua against the Hyprland version in Arch
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.4
+          python3 scripts/check-hyprland-config.py --lua lua5.4
 
   build:
     needs: check
-    if: github.event_name != 'pull_request'
+    # the ISO is built only on demand (Run workflow) or for a release tag
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:

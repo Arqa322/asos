@@ -37,6 +37,48 @@ fi
 [[ $EUID -eq 0 ]] || { echo "run as root: sudo ./build.sh  (or ./build.sh --docker)" >&2; exit 1; }
 command -v mkarchiso >/dev/null || { echo "mkarchiso not found: pacman -S archiso" >&2; exit 1; }
 
+# ------------------------------------------------------------- preflight ---
+NEED_GB=${NEED_GB:-40}
+CACHE_DIR=$(pacman-conf CacheDir 2>/dev/null | head -n1); CACHE_DIR=${CACHE_DIR:-/var/cache/pacman/pkg/}
+if [[ -d /run/archiso && "${ALLOW_LIVE:-0}" != 1 ]]; then
+	echo "!! build.sh запущен в live-образе Arch: файлы пишутся в оперативную память, места не хватит." >&2
+	echo "   Соберите на установленной системе с диском от ${NEED_GB} ГБ, через ./build.sh --docker или в GitHub Actions." >&2
+	exit 1
+fi
+mkdir -p "$WORK_DIR" "$OUT_DIR" "$CACHE_DIR"
+free_gb() { df -P -BG "$1" | awk 'NR==2 {gsub("G","",$4); print $4}'; }
+declare -A seen=()
+for d in "$WORK_DIR" "$OUT_DIR" "$CACHE_DIR"; do
+	fs=$(df -P "$d" | awk 'NR==2 {print $1}')
+	[[ -n "${seen[$fs]:-}" ]] && continue; seen[$fs]=1
+	f=$(free_gb "$d")
+	if (( f < NEED_GB )); then
+		echo "!! мало места: на $d (файловая система $fs) свободно ${f} ГБ, нужно не меньше ${NEED_GB} ГБ" >&2
+		echo "   (развёрнутая система ~15 ГБ + кэш пакетов ~6 ГБ + сжатый образ и ISO по ~7 ГБ)." >&2
+		echo "   При нехватке места pacman оставляет недокачанные пакеты и пишет об ошибке подписи (signature)." >&2
+		echo "   Освободите место, укажите другой диск (WORK_DIR=/путь OUT_DIR=/путь) или соберите в GitHub Actions." >&2
+		[[ "${IGNORE_SPACE:-0}" == 1 ]] || exit 1
+	fi
+done
+
+echo ":: Проверка ключей pacman"
+[[ -s /etc/pacman.d/gnupg/pubring.gpg || -s /etc/pacman.d/gnupg/pubring.kbx ]] || pacman-key --init
+pacman-key --populate archlinux >/dev/null
+pacman -Sy --noconfirm --needed archlinux-keyring
+
+clean_cache() { # partial downloads and packages without a detached signature
+	local f removed=0
+	[[ -d "$CACHE_DIR" && "$(realpath "$CACHE_DIR")" != / ]] || return 0
+	shopt -s nullglob
+	for f in "$CACHE_DIR"/*.part "$CACHE_DIR"/download-*; do rm -rf "$f"; removed=$((removed + 1)); done
+	for f in "$CACHE_DIR"/*.pkg.tar.zst "$CACHE_DIR"/*.pkg.tar.xz; do
+		[[ -s "$f.sig" ]] || { rm -f "$f"; removed=$((removed + 1)); }
+	done
+	shopt -u nullglob
+	(( removed == 0 )) || echo ":: кэш pacman: удалено $removed недокачанных или неподписанных файлов"
+}
+clean_cache
+
 PROFILE="$WORK_DIR/profile"
 AUR_REPO="$WORK_DIR/aur-repo"
 ISO_WORK="$WORK_DIR/mkarchiso"
@@ -74,7 +116,27 @@ if [[ "${SKIP_ARDUINO:-0}" != 1 ]]; then
 fi
 
 echo ":: Building ISO"
-mkarchiso -v -w "$ISO_WORK" -o "$OUT_DIR" "$PROFILE"
+LOG="$WORK_DIR/mkarchiso.log"
+if ! mkarchiso -v -w "$ISO_WORK" -o "$OUT_DIR" "$PROFILE" 2>&1 | tee "$LOG"; then
+	if grep -q -i -E 'signature|PGP|corrupted|invalid or corrupted package' "$LOG"; then
+		echo "!! ошибка проверки подписи пакетов: обновляю ключи, чищу кэш и пробую ещё раз"
+		pacman -Sy --noconfirm archlinux-keyring
+		pacman-key --populate archlinux >/dev/null
+		grep -o -E "[a-z0-9@._+-]+-[0-9][^ ]*\.pkg\.tar\.(zst|xz)" "$LOG" | sort -u | while read -r bad; do rm -f "$CACHE_DIR/$bad" "$CACHE_DIR/$bad.sig"; done
+		clean_cache
+		rm -rf "$ISO_WORK"
+		mkarchiso -v -w "$ISO_WORK" -o "$OUT_DIR" "$PROFILE" 2>&1 | tee "$LOG" || {
+			echo "!! сборка снова не удалась. Последние ошибки:" >&2
+			grep -i -E 'error|ошибка' "$LOG" | tail -n 15 >&2
+			echo "   Полный журнал: $LOG" >&2
+			exit 1
+		}
+	else
+		echo "!! mkarchiso завершился с ошибкой, журнал: $LOG" >&2
+		grep -i -E 'error|ошибка' "$LOG" | tail -n 15 >&2
+		exit 1
+	fi
+fi
 rm -rf "$ISO_WORK"
 
 cd "$OUT_DIR"

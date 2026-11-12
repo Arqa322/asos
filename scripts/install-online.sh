@@ -281,6 +281,7 @@ if [[ $UEFI == 1 ]]; then
 	printf 'default asos.conf\ntimeout 3\nconsole-mode max\neditor no\n' >/boot/loader/loader.conf
 	printf 'title   ASOS (Arch Linux + Hyprland)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux.img\noptions %s\n' "$CMDLINE" >/boot/loader/entries/asos.conf
 	printf 'title   ASOS (fallback initramfs)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux-fallback.img\noptions %s\n' "$CMDLINE" >/boot/loader/entries/asos-fallback.conf
+	printf 'title   ASOS (безопасная графика: sway без 3D)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux.img\noptions %s asos.session=sway-software\n' "$CMDLINE" >/boot/loader/entries/asos-safe.conf
 	systemctl enable systemd-boot-update.service || true
 else
 	sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT="$ROOTFLAGS quiet splash loglevel=3"|' /etc/default/grub
@@ -326,19 +327,8 @@ if [[ "${ASOS_SKIP_ARDUINO:-0}" != 1 ]]; then
 		warn "Arduino не настроен — позже: asos-arduino setup avr"
 fi
 
-# ---------------------------------------------------------- VM tweaks ---
-if [[ "$VIRT" != none ]]; then
-	step "Настройки для виртуальной машины ($VIRT)"
-	cat >>"$MNT/home/$ASOS_USER/.config/hypr/user.conf" <<'EOF'
-
-# --- added by ASOS installer: virtual machine ---
-# hardware cursors are broken on most virtual GPUs
-cursor {
-    no_hardware_cursors = true
-}
-EOF
-	arch-chroot "$MNT" chown "$ASOS_USER:$ASOS_USER" "/home/$ASOS_USER/.config/hypr/user.conf"
-fi
+# VM tweaks for Hyprland (cursor, blur) are applied by hyprland.lua itself;
+# asos-session picks a working graphics mode on first login.
 
 rm -rf "$MNT/root/asos-src"
 clean_cache

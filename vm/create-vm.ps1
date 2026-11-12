@@ -15,6 +15,8 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\create-vm.ps1
 .EXAMPLE
+  .\create-vm.ps1 -TypeUpdate      # type the ASOS update command into the running VM
+.EXAMPLE
   .\create-vm.ps1 -Iso "D:\iso\archlinux-2026.11.01-x86_64.iso" -Name ASOS-test
 #>
 [CmdletBinding()]
@@ -26,12 +28,14 @@ param(
     [int]$DiskGB = 20,
     [int]$BootWaitSeconds = 90,
     [switch]$NoAutoType,
-    [switch]$Recreate
+    [switch]$Recreate,
+    [switch]$TypeUpdate
 )
 # "Continue": in Windows PowerShell 5.1 "Stop" turns any stderr line of a native
 # command redirected with 2>$null into a terminating error. Exit codes are checked instead.
 $ErrorActionPreference = "Continue"
 $script:AlreadyRunning = $false
+$UpdateCmd = "curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash"
 $InstallCmd = "curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh && bash i.sh"
 
 function Info($m) { Write-Host ":: $m" -ForegroundColor Green }
@@ -50,6 +54,17 @@ if (-not $vbm) {
 if (-not $vbm) { Fail "VBoxManage.exe не найден — установлен ли Oracle VirtualBox?" }
 $ver = (& $vbm --version) -join ""
 Info "VirtualBox $ver"
+
+# -TypeUpdate: type the ASOS update command into an already running VM
+# (log in on a text console first: Host key + F2 in the VM window)
+if ($TypeUpdate) {
+    $state = ((& $vbm showvminfo $Name --machinereadable 2>$null) | Where-Object { $_ -like 'VMState=*' }) -replace '^VMState="', '' -replace '"$', ''
+    if ($state -ne "running") { Fail "ВМ `"$Name`" не запущена (состояние: $state)" }
+    & $vbm controlvm $Name keyboardputstring $UpdateCmd | Out-Null
+    & $vbm controlvm $Name keyboardputscancode 1c 9c | Out-Null
+    Info "команда обновления введена в ВМ `"$Name`". Введите в ВМ пароль пользователя для sudo."
+    exit 0
+}
 
 function VBox {  # run VBoxManage, fail on error
     & $vbm @args

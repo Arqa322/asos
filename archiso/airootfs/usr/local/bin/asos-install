@@ -198,6 +198,12 @@ linux   /vmlinuz-linux
 initrd  /initramfs-linux-fallback.img
 options $CMDLINE
 EOT
+	cat >/boot/loader/entries/asos-safe.conf <<EOT
+title   ASOS (безопасная графика: sway без 3D)
+linux   /vmlinuz-linux
+initrd  /initramfs-linux.img
+options $CMDLINE asos.session=sway-software
+EOT
 	systemctl enable systemd-boot-update.service || true
 else
 	sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT="$ROOTFLAGS quiet splash loglevel=3"|' /etc/default/grub
