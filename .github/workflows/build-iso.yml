@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Shell syntax
         run: |
           for f in build.sh scripts/*.sh vm/*.sh archiso/airootfs/usr/local/bin/*; do bash -n "$f"; done
@@ -40,6 +40,14 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq lua5.4
           python3 scripts/check-hyprland-config.py --lua lua5.4
+      - name: The config checker must reject a broken config
+        run: |
+          if python3 scripts/check-hyprland-config.py --lua lua5.4 --config scripts/tests/hyprland-bad.lua | tee bad.txt; then
+            echo "::error::check-hyprland-config.py accepted a broken config"; exit 1
+          fi
+          for want in "unknown option general:gaps_inn" "decoration:rounding expects Int" "cursor:no_hardware_cursors expects Int" "unknown option misc:vfr" "unknown event" "closee"; do
+            grep -q "$want" bad.txt || { echo "::error::checker missed: $want"; exit 1; }
+          done
 
   build:
     needs: check
@@ -54,7 +62,7 @@ jobs:
           sudo docker image prune --all --force
           df -h /
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build ISO in Arch Linux container
         run: ./build.sh --docker
