@@ -31,7 +31,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/out}"
 WORK_DIR="${WORK_DIR:-$ROOT/work}"
 
-WITHOUT="${HUILO_WITHOUT:-}"
+WITHOUT="${HUILO_WITHOUT:-${ASOS_WITHOUT:-}}"   # ASOS_WITHOUT: the name before the rename (legacy)
 DOCKER=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in

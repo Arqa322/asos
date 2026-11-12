@@ -1,5 +1,5 @@
 [Unit]
-Description=Huilo text console colours (Catppuccin Mocha)
+Description=Huilo text console colours (Huilo Dusk palette)
 DefaultDependencies=no
 After=systemd-vconsole-setup.service
 Before=getty@tty1.service

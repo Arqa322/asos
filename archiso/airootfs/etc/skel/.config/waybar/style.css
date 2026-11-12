@@ -1,41 +1,119 @@
+/* generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy) */
+/* Huilo bar: floating islands on a transparent strip. Colours: theme/palette.toml */
 * {
-    font-family: "JetBrainsMono Nerd Font", "Noto Sans", sans-serif;
+    font-family: "Inter", "JetBrainsMono Nerd Font", sans-serif;
     font-size: 13px;
+    font-weight: 500;
     min-height: 0;
+    border: none;
+    border-radius: 0;
 }
 
 window#waybar {
-    background: rgba(30, 30, 46, 0.88);
-    color: #cdd6f4;
-    border-bottom: 2px solid rgba(137, 180, 250, 0.4);
-}
-
-#workspaces button {
-    padding: 0 8px;
-    color: #a6adc8;
     background: transparent;
-    border-radius: 6px;
-}
-#workspaces button.active { color: #1e1e2e; background: #89b4fa; }
-#workspaces button:hover  { background: #45475a; }
-
-#custom-launcher { color: #89b4fa; font-size: 16px; padding: 0 6px; }
-
-#clock, #pulseaudio, #network, #cpu, #memory, #temperature, #battery,
-#language, #tray, #custom-zapret, #custom-power {
-    padding: 0 10px;
-    margin: 4px 0;
-    border-radius: 6px;
-    background: #313244;
+    color: #ece7dc;
 }
 
-#custom-health.error    { color: #1e1e2e; background: #fab387; padding: 0 10px; margin: 4px 0; border-radius: 6px; }
-#custom-health.critical { color: #1e1e2e; background: #f38ba8; padding: 0 10px; margin: 4px 0; border-radius: 6px; }
-#custom-zapret.on  { color: #1e1e2e; background: #a6e3a1; }
-#custom-zapret.off { color: #1e1e2e; background: #f38ba8; }
-#battery.warning   { color: #f9e2af; }
-#battery.critical  { color: #f38ba8; }
-#temperature.critical { color: #f38ba8; }
-#custom-power { color: #f38ba8; margin-right: 6px; }
+tooltip {
+    background: rgba(@{ink1.rgb}, 0.96);
+    border: 1px solid rgba(242, 163, 58, 0.35);
+    border-radius: 12px;
+}
+tooltip label { color: #ece7dc; padding: 4px 6px; }
 
-#custom-safe { color: #1e1e2e; background: #f9e2af; padding: 0 10px; margin: 4px 0; border-radius: 6px; }
+/* islands */
+.modules-left, .modules-center, .modules-right {
+    background: rgba(@{ink1.rgb}, 0.78);
+    border: 1px solid rgba(@{ink4.rgb}, 0.9);
+    border-radius: 16px;
+    padding: 0 6px;
+}
+.modules-left  { margin-left: 2px; }
+.modules-right { margin-right: 2px; }
+
+#custom-launcher {
+    color: @{ink0};
+    background: linear-gradient(135deg, #f2a33a, #ff6b4a);
+    border-radius: 11px;
+    margin: 4px 4px 4px 0;
+    padding: 0 11px 0 9px;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+/* workspaces: small dots, the active one stretches into an amber pill */
+#workspaces { margin: 0 4px; }
+#workspaces button {
+    color: #8a91a5;
+    background: rgba(@{ink4.rgb}, 0.7);
+    margin: 9px 3px;
+    padding: 0;
+    min-width: 12px;
+    border-radius: 99px;
+    font-size: 0;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#workspaces button.empty   { background: rgba(@{ink4.rgb}, 0.45); }
+#workspaces button:hover   { background: #b9bfcc; }
+#workspaces button.active  { min-width: 30px; background: linear-gradient(90deg, #f2a33a, #ff6b4a); }
+#workspaces button.urgent  { background: #f0566a; }
+#workspaces button.special { background: #b08ad8; }
+
+#window { color: #b9bfcc; padding: 0 8px; }
+window#waybar.empty #window { padding: 0; }
+
+#clock {
+    color: #ece7dc;
+    font-weight: 700;
+    padding: 0 12px;
+}
+#clock.date { color: #8a91a5; font-weight: 500; padding-left: 0; }
+
+#custom-health, #custom-zapret, #custom-notifications, #language, #pulseaudio,
+#network, #bluetooth, #cpu, #memory, #temperature, #battery, #tray, #custom-power,
+#idle_inhibitor {
+    color: #b9bfcc;
+    padding: 0 9px;
+    margin: 5px 1px;
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+#custom-health:hover, #custom-zapret:hover, #custom-notifications:hover, #language:hover,
+#pulseaudio:hover, #network:hover, #bluetooth:hover, #cpu:hover, #memory:hover,
+#battery:hover, #custom-power:hover, #idle_inhibitor:hover {
+    background: rgba(@{ink3.rgb}, 0.95);
+    color: #ece7dc;
+}
+
+#cpu, #memory, #temperature { color: #8a91a5; padding: 0 6px; }
+#pulseaudio { color: #ffc978; }
+#pulseaudio.muted { color: #8a91a5; }
+#network.disconnected, #bluetooth.off, #bluetooth.disabled { color: #8a91a5; }
+#language { color: #7cc4d8; font-weight: 700; }
+#idle_inhibitor.activated { color: #f2a33a; }
+
+#custom-zapret.on  { color: #8bc78f; }
+#custom-zapret.off { color: #f0566a; }
+
+#custom-health        { padding: 0 0; margin: 5px 0; }
+#custom-health.ok     { color: #8bc78f; padding: 0 7px; }
+#custom-health.error  { color: @{ink0}; background: #ffc978; padding: 0 9px; }
+#custom-health.critical { color: #ece7dc; background: #f0566a; padding: 0 9px; }
+
+#custom-notifications.notification, #custom-notifications.dnd-notification { color: #f2a33a; }
+#custom-notifications.dnd-none, #custom-notifications.dnd-notification { color: #8a91a5; }
+
+#battery.charging        { color: #8bc78f; }
+#battery.warning:not(.charging)  { color: #ffc978; }
+#battery.critical:not(.charging) { color: #ece7dc; background: #f0566a; }
+#temperature.critical    { color: #f0566a; }
+
+#tray > .passive        { -gtk-icon-effect: dim; }
+#tray > .needs-attention { background: rgba(240, 86, 106, 0.25); border-radius: 8px; }
+#tray menu { background: @{ink1}; color: #ece7dc; border-radius: 10px; }
+
+#custom-power { color: #ff6b4a; margin-right: 0; padding: 0 11px 0 9px; }
+
+/* safe graphics mode (sway): a visible reminder */
+#custom-safe { color: @{ink0}; background: #ffc978; padding: 0 10px; margin: 5px 2px; border-radius: 10px; font-weight: 700; }
+#mode { color: @{ink0}; background: #f2a33a; padding: 0 10px; margin: 5px 2px; border-radius: 10px; }

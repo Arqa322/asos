@@ -4,7 +4,7 @@
   python3 scripts/make-wallpapers.py [--out DIR] [--size 3840x2160] [--only NAME]
 
 All images are made from scratch here — noise, curves and particles in the
-Catppuccin Mocha palette used across Huilo — so they can be shipped freely.
+Huilo Dusk palette (theme/palette.toml) — so they can be shipped freely.
 Outputs JPEG wallpapers, 480x270 thumbnails (wallpaper picker) and the
 640x480 syslinux boot menu background. Needs numpy and Pillow.
 """
@@ -18,17 +18,26 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "archiso", "airootfs", "usr", "share", "backgrounds", "huilo")
 SPLASH = os.path.join(ROOT, "archiso", "syslinux", "splash.png")
-PHOTO = os.path.join(ROOT, "assets", "huilo-photo.jpg")      # the project photo (boot splash, wallpaper #1)
+PHOTO = os.path.join(ROOT, "assets", "huilo-photo.jpg")      # the project photo: boot screens only
 PLYMOUTH = os.path.join(ROOT, "archiso", "airootfs", "usr", "share", "plymouth", "themes", "huilo")
 
-C = {  # Catppuccin Mocha
-    "crust": "#11111b", "mantle": "#181825", "base": "#1e1e2e", "surface0": "#313244",
-    "surface1": "#45475a", "overlay0": "#6c7086", "lavender": "#b4befe", "blue": "#89b4fa",
-    "sapphire": "#74c7ec", "sky": "#89dceb", "teal": "#94e2d5", "green": "#a6e3a1",
-    "yellow": "#f9e2af", "peach": "#fab387", "maroon": "#eba0ac", "red": "#f38ba8",
-    "mauve": "#cba6f7", "pink": "#f5c2e7", "flamingo": "#f2cdcd", "rosewater": "#f5e0dc",
-    "text": "#cdd6f4",
-}
+def _palette():
+    """Colour names used by the drawing code, taken from theme/palette.toml."""
+    import tomllib
+    with open(os.path.join(ROOT, "theme", "palette.toml"), "rb") as f:
+        p = tomllib.load(f)
+    c, t = p["colors"], p["terminal"]
+    return {
+        "crust": c["ink0"], "mantle": c["ink1"], "base": c["ink2"], "surface0": c["ink3"],
+        "surface1": c["ink4"], "overlay0": c["mist"], "text": c["snow"], "rosewater": "#f6e8d2",
+        "lavender": t["bright_blue"], "blue": c["dusk"], "sapphire": c["glacier"], "sky": t["bright_cyan"],
+        "teal": c["glacier"], "green": c["pine"], "yellow": c["honey"], "peach": c["amber"],
+        "maroon": c["ember"], "red": c["berry"], "mauve": c["heather"], "pink": "#ff9a7a",
+        "flamingo": c["honey"],
+    }
+
+
+C = _palette()
 
 
 def rgb(name):
@@ -148,7 +157,7 @@ def vgradient(h, w, stops):
 # ------------------------------------------------------------ wallpapers ---
 def peaks(w, h, rng):
     """Night mountains: ridged peaks in layered mist, glowing horizon, moon, stars."""
-    img = vgradient(h, w, [(0, "crust"), (0.30, "#141322"), (0.52, "#2a2541"), (0.64, "#5a4566"), (0.70, "#7a5a6e"), (1, "#7a5a6e")])
+    img = vgradient(h, w, [(0, "crust"), (0.22, "#121726"), (0.36, "#26304a"), (0.44, "#5e5268"), (0.51, "#b8744c"), (1, "#b8744c")])
     img = stars(img, rng, w * h / 2400, ymax=0.55)
     Y, X = np.ogrid[:h, :w]
     mx, my, mr = w * 0.70, h * 0.22, h * 0.042
@@ -163,13 +172,13 @@ def peaks(w, h, rng):
     edge = smoothstep(mr, mr - 1.5, d)
     img = lerp(img, moon, (edge * disc)[..., None])
     hy = np.arange(h, dtype=np.float32)[:, None]
-    img += (np.exp(-((hy - h * 0.62) / (h * 0.09)) ** 2) * 0.20)[..., None] * rgb("peach") * np.ones((1, w, 1))
+    img += (np.exp(-((hy - h * 0.47) / (h * 0.08)) ** 2) * 0.24)[..., None] * rgb("peach") * np.ones((1, w, 1))
     layers = [  # base, height, periods, top colour, bottom colour, mist
-        (0.50, 0.16, 1.6, "#7d6a93", "#5c4f78", 0.9),
-        (0.56, 0.18, 2.2, "#5d5280", "#3d3760", 0.7),
-        (0.64, 0.17, 2.8, "#3f3a63", "#28264a", 0.55),
-        (0.74, 0.15, 3.4, "#262443", "#17162b", 0.35),
-        (0.86, 0.12, 4.2, "#14131f", "#0b0b12", 0.0),
+        (0.50, 0.16, 1.6, "#6d6f8a", "#4f5572", 0.9),
+        (0.56, 0.18, 2.2, "#4e5574", "#373e5b", 0.7),
+        (0.64, 0.17, 2.8, "#363d5a", "#242a42", 0.55),
+        (0.74, 0.15, 3.4, "#21273b", "#151a28", 0.35),
+        (0.86, 0.12, 4.2, "#11141c", "#0a0c11", 0.0),
     ]
     for base, amp, periods, ctop, cbot, mist in layers:
         n = fbm1d(w, periods, rng, octaves=7, gain=0.55)
@@ -193,13 +202,13 @@ def peaks(w, h, rng):
         img += (np.exp(-(dist / 1.3) ** 2) * 0.07)[..., None] * rgb("lavender")
         if mist:
             fogk = (np.exp(-((dist_s - h * 0.10) / (h * 0.07)) ** 2) * 0.35 * mist)[..., None]
-            img = lerp(img, rgb("#4a3f63") * np.ones_like(img), fogk * mask[..., None])
+            img = lerp(img, rgb("#4d5268") * np.ones_like(img), fogk * mask[..., None])
     return img * vignette(h, w, 0.35)[..., None]
 
 def aurora(w, h, rng):
     """Aurora curtains over dark hills and a lake reflection."""
     horizon = int(h * 0.68)
-    img = vgradient(h, w, [(0, "crust"), (0.5, "#151525"), (0.68, "#1f2236"), (1, "crust")])
+    img = vgradient(h, w, [(0, "crust"), (0.5, "#121827"), (0.68, "#1c2436"), (1, "crust")])
     img = stars(img, rng, w * h / 3200, ymax=0.6)
     sky_h = horizon
     yy = np.arange(sky_h, dtype=np.float32)[:, None]
@@ -223,7 +232,7 @@ def aurora(w, h, rng):
     img[:sky_h] += acc * 0.95
     # hills
     hy = np.arange(h, dtype=np.float32)[:, None]
-    for base, amp, periods, col in [(0.66, 0.07, 2.5, "#1a1b2b"), (0.69, 0.04, 4.0, "#11111b")]:
+    for base, amp, periods, col in [(0.66, 0.07, 2.5, "#171c29"), (0.69, 0.04, 4.0, "#0e1117")]:
         ridge = fbm1d(w, periods, rng, octaves=6)
         top = (base - amp * (ridge - ridge.min()) / (np.ptp(ridge) + 1e-6)) * h
         mask = smoothstep(-1.2, 1.2, hy - top[None, :]) * (hy < horizon + 2)
@@ -244,7 +253,7 @@ def aurora(w, h, rng):
 
 def flow(w, h, rng):
     """Silk-like streamlines along a smooth, mostly left-to-right flow field."""
-    img = vgradient(h, w, [(0, "crust"), (1, "#16162a")])
+    img = vgradient(h, w, [(0, "crust"), (1, "#141a28")])
     fh, fw = h // 8, w // 8
     field = fbm((fh, fw), (2, 3), rng, octaves=3, gain=0.45)
     ang = field * math.pi * 0.9 + 0.12           # mostly to the right, gently curving
@@ -286,7 +295,7 @@ def waves(w, h, rng):
     img = stars(img, rng, w * h / 9000, ymax=0.45, big=0.0)
     x = np.linspace(0, 1, w, dtype=np.float32)
     hy = np.arange(h, dtype=np.float32)[:, None]
-    pal = ["#1e1e2e", "surface0", "blue", "sapphire", "lavender", "mauve", "pink", "peach"]
+    pal = ["base", "surface0", "blue", "sapphire", "lavender", "mauve", "pink", "peach"]
     n = 9
     for i in range(n):
         t = i / (n - 1)
@@ -339,26 +348,26 @@ def emblem(layer, cx, cy, s):
     rd = ImageDraw.Draw(ring)
     rw, rh, th = s * 1.55, s * 0.32, max(2, int(s * 0.035))
     box = [cx - rw, cy + s * 0.16 - rh, cx + rw, cy + s * 0.16 + rh]
-    rd.arc(box, 180, 360, fill=(203, 166, 247, 255), width=th)          # back half
+    rd.arc(box, 180, 360, fill=tuple(int(v * 255) for v in rgb("yellow")) + (255,), width=th)   # back half
     layer.alpha_composite(ring)
-    # peak with a vertical blue -> mauve gradient
+    # peak with a vertical amber -> ember gradient
     mask = Image.new("L", (w, h), 0)
     md = ImageDraw.Draw(mask)
     md.polygon([(cx, cy - s), (cx + s * 0.86, cy + s * 0.78), (cx - s * 0.86, cy + s * 0.78)], fill=255)
     md.polygon([(cx, cy - s * 0.36), (cx + s * 0.40, cy + s * 0.46), (cx - s * 0.40, cy + s * 0.46)], fill=0)
     t = np.clip((np.arange(h, dtype=np.float32) - (cy - s)) / (s * 1.78), 0, 1)[:, None]
-    grad = lerp(rgb("blue"), rgb("mauve"), t)[..., None, :] * np.ones((1, w, 1), np.float32)
+    grad = lerp(rgb("peach"), rgb("maroon"), t)[..., None, :] * np.ones((1, w, 1), np.float32)
     grad = np.concatenate([grad.reshape(h, w, 3), np.asarray(mask, np.float32)[..., None] / 255], -1)
     layer.alpha_composite(Image.fromarray((grad * 255).astype(np.uint8), "RGBA"))
     front = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(front).arc(box, 0, 180, fill=(245, 194, 231, 255), width=th)   # front half
+    ImageDraw.Draw(front).arc(box, 0, 180, fill=tuple(int(v * 255) for v in rgb("text")) + (255,), width=th)   # front half
     layer.alpha_composite(front)
 
 def mark(w, h, rng, size=None):
     """Minimal wallpaper: radial glow + the Huilo emblem and wordmark."""
     Y, X = np.ogrid[:h, :w]
     d = np.sqrt(((X - w / 2) / w) ** 2 + ((Y - h * 0.45) / h) ** 2)
-    img = gradient_map(np.clip(d * 1.6, 0, 1), [(0, "#2a2a44"), (0.45, "base"), (1, "crust")])
+    img = gradient_map(np.clip(d * 1.6, 0, 1), [(0, "#262c40"), (0.45, "base"), (1, "crust")])
     ss = 2
     layer = Image.new("RGBA", (w * ss, h * ss), (0, 0, 0, 0))
     s = h * 0.16 * ss
@@ -368,7 +377,7 @@ def mark(w, h, rng, size=None):
         font = ImageFont.truetype("/usr/share/fonts/opentype/inter/Inter-Light.otf", int(h * 0.055 * ss))
         text = "H U I L O"
         tw = dr.textlength(text, font=font)
-        dr.text((w * ss / 2 - tw / 2, h * 0.66 * ss), text, font=font, fill=(205, 214, 244, 235))
+        dr.text((w * ss / 2 - tw / 2, h * 0.66 * ss), text, font=font, fill=tuple(int(v * 255) for v in rgb("text")) + (235,))
     except OSError:
         pass
     layer = layer.resize((w, h), Image.LANCZOS)
@@ -387,7 +396,7 @@ def fit_on_blur(src, w, h, blur=40, darken=0.35):
     bg = src.resize((max(w, int(sw * cover + 0.5)), max(h, int(sh * cover + 0.5))), Image.LANCZOS)
     bg = bg.crop(((bg.width - w) // 2, (bg.height - h) // 2, (bg.width - w) // 2 + w, (bg.height - h) // 2 + h))
     bg = bg.filter(ImageFilter.GaussianBlur(blur))
-    bg = Image.blend(bg, Image.new("RGB", (w, h), (17, 17, 27)), darken)
+    bg = Image.blend(bg, Image.new("RGB", (w, h), tuple(int(v * 255) for v in rgb("crust"))), darken)
     fit = min(w / sw, h / sh)
     fg = src.resize((int(sw * fit + 0.5), int(sh * fit + 0.5)), Image.LANCZOS)
     if fit > 1.5:  # upscaled a lot: a light unsharp mask keeps edges crisp
@@ -399,11 +408,6 @@ def fit_on_blur(src, w, h, blur=40, darken=0.35):
     bg.paste(Image.new("RGB", (w, h), (0, 0, 0)), (0, 0), shadow)
     bg.paste(fg, (x, y))
     return bg
-
-
-def photo(w, h, rng):
-    src = Image.open(PHOTO).convert("RGB")
-    return np.asarray(fit_on_blur(src, w, h), np.float32) / 255
 
 
 def photo_assets():
@@ -423,10 +427,9 @@ def photo_assets():
 
 # fixed seeds per wallpaper: adding or reordering entries never changes the others
 SEEDS = {"huilo-peaks": 1000, "huilo-aurora": 1001, "huilo-flow": 1002, "huilo-waves": 1003,
-         "huilo-nebula": 1004, "huilo-mark": 1005, "huilo-photo": 1006}
+         "huilo-nebula": 1004, "huilo-mark": 1005}
 
 WALLPAPERS = [
-    ("huilo-photo", "В пизду (фото)", photo),
     ("huilo-peaks", "Горы в сумерках", peaks),
     ("huilo-aurora", "Северное сияние", aurora),
     ("huilo-flow", "Поток", flow),

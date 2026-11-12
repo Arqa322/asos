@@ -1,16 +1,17 @@
-# Huilo prompt (starship) — Catppuccin Mocha, rounded powerline segments
+# generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy)
+# Huilo prompt (starship): rounded segments in the Huilo Dusk palette
 "$schema" = "https://starship.rs/config-schema.json"
 
 format = """
-[](fg:blue)\
+[](fg:amber)\
 $os\
 $username\
-[](fg:blue bg:mauve)\
+[](fg:amber bg:ink3)\
 $directory\
-[](fg:mauve bg:surface0)\
+[](fg:ink3 bg:ink2)\
 $git_branch\
 $git_status\
-[](fg:surface0 bg:surface1)\
+[](fg:ink2 bg:ink1)\
 $c\
 $rust\
 $golang\
@@ -18,38 +19,35 @@ $python\
 $nodejs\
 $lua\
 $docker_context\
-[](fg:surface1)\
+[](fg:ink1)\
 $cmd_duration\
 $line_break\
 $character"""
 
 add_newline = true
-palette = "catppuccin_mocha"
+palette = "huilo"
 
-[palettes.catppuccin_mocha]
-rosewater = "#f5e0dc"
-pink = "#f5c2e7"
-mauve = "#cba6f7"
-red = "#f38ba8"
-peach = "#fab387"
-yellow = "#f9e2af"
-green = "#a6e3a1"
-teal = "#94e2d5"
-sky = "#89dceb"
-sapphire = "#74c7ec"
-blue = "#89b4fa"
-lavender = "#b4befe"
-text = "#cdd6f4"
-overlay0 = "#6c7086"
-surface1 = "#45475a"
-surface0 = "#313244"
-base = "#1e1e2e"
-mantle = "#181825"
-crust = "#11111b"
+[palettes.huilo]
+ink0 = "@{ink0}"
+ink1 = "@{ink1}"
+ink2 = "@{ink2}"
+ink3 = "@{ink3}"
+ink4 = "@{ink4}"
+mist = "#8a91a5"
+fog = "#b9bfcc"
+snow = "#ece7dc"
+amber = "#f2a33a"
+honey = "#ffc978"
+ember = "#ff6b4a"
+dusk = "#6f8fc7"
+glacier = "#7cc4d8"
+pine = "#8bc78f"
+berry = "#f0566a"
+heather = "#b08ad8"
 
 [os]
 disabled = false
-style = "bg:blue fg:crust"
+style = "bg:amber fg:ink0"
 format = "[ $symbol]($style)"
 
 [os.symbols]
@@ -58,14 +56,14 @@ Linux = " "
 
 [username]
 show_always = true
-style_user = "bg:blue fg:crust bold"
-style_root = "bg:red fg:crust bold"
+style_user = "bg:amber fg:ink0 bold"
+style_root = "bg:berry fg:ink0 bold"
 format = "[$user ]($style)"
 
 [directory]
-style = "bg:mauve fg:crust"
+style = "bg:ink3 fg:snow"
 read_only = " 󰌾"
-read_only_style = "bg:mauve fg:red"
+read_only_style = "bg:ink3 fg:berry"
 format = "[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
@@ -79,54 +77,54 @@ truncation_symbol = "…/"
 
 [git_branch]
 symbol = ""
-style = "bg:surface0 fg:mauve"
+style = "bg:ink2 fg:honey"
 format = "[ $symbol $branch]($style)"
 
 [git_status]
-style = "bg:surface0 fg:pink"
-format = "[( $all_status$ahead_behind)]($style)[ ](bg:surface0)"
+style = "bg:ink2 fg:ember"
+format = "[( $all_status$ahead_behind)]($style)[ ](bg:ink2)"
 
 [c]
 symbol = " "
-style = "bg:surface1 fg:blue"
+style = "bg:ink1 fg:dusk"
 format = "[ $symbol($version)]($style)"
 
 [rust]
 symbol = " "
-style = "bg:surface1 fg:peach"
+style = "bg:ink1 fg:ember"
 format = "[ $symbol($version)]($style)"
 
 [golang]
 symbol = " "
-style = "bg:surface1 fg:sapphire"
+style = "bg:ink1 fg:glacier"
 format = "[ $symbol($version)]($style)"
 
 [python]
 symbol = " "
-style = "bg:surface1 fg:yellow"
+style = "bg:ink1 fg:honey"
 format = "[ $symbol($version)( \\($virtualenv\\))]($style)"
 
 [nodejs]
 symbol = " "
-style = "bg:surface1 fg:green"
+style = "bg:ink1 fg:pine"
 format = "[ $symbol($version)]($style)"
 
 [lua]
 symbol = " "
-style = "bg:surface1 fg:blue"
+style = "bg:ink1 fg:dusk"
 format = "[ $symbol($version)]($style)"
 
 [docker_context]
 symbol = " "
-style = "bg:surface1 fg:sapphire"
+style = "bg:ink1 fg:glacier"
 format = "[ $symbol$context]($style)"
 
 [cmd_duration]
 min_time = 2000
-style = "fg:yellow"
+style = "fg:honey"
 format = " [󱦟 $duration]($style)"
 
 [character]
-success_symbol = "[❯](bold fg:green)"
-error_symbol = "[❯](bold fg:red)"
-vimcmd_symbol = "[❮](bold fg:green)"
+success_symbol = "[❯](bold fg:amber)"
+error_symbol = "[❯](bold fg:berry)"
+vimcmd_symbol = "[❮](bold fg:amber)"

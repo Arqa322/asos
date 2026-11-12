@@ -89,8 +89,14 @@ xdg-desktop-portal-gtk
 qt5-wayland
 qt6-wayland
 waybar
-wofi
-mako
+# Huilo look: launcher and menus, notification centre, volume/brightness OSD
+rofi
+rofi-emoji
+rofi-calc
+wtype
+swaync
+swayosd
+hyprsunset
 libnotify
 kitty
 swaybg
@@ -112,9 +118,14 @@ ffmpegthumbnailer
 file-roller
 nwg-look
 gnome-themes-extra
+adw-gtk-theme
 papirus-icon-theme
+capitaine-cursors
+dconf
 qt5ct
 qt6ct
+# nice text interfaces in scripts (huilo-ai ...)
+gum
 # safe graphics mode (CPU rendering) when Hyprland cannot start, e.g. VMs without 3D
 sway
 foot
@@ -156,6 +167,7 @@ ttf-dejavu
 ttf-liberation
 ttf-jetbrains-mono-nerd
 otf-font-awesome
+inter-font
 
 # ---------- Browser ----------
 firefox
@@ -191,6 +203,10 @@ gimp
 
 # ---------- [vscode] VS Code (Code - OSS) ----------
 code
+
+# ---------- [ai] AI assistant: local model runtime (huilo-ai) ----------
+ollama
+glow
 
 # ---------- [games] Atom game pack ----------
 # 32-bit drivers are needed only by Steam/Wine

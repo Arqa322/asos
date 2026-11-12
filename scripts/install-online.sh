@@ -24,7 +24,7 @@
 # ============================================================================
 set -euo pipefail
 
-WITHOUT="${HUILO_WITHOUT:-}"; WITHOUT_GIVEN=0; LIST_GROUPS=0
+WITHOUT="${HUILO_WITHOUT:-${ASOS_WITHOUT:-}}"; WITHOUT_GIVEN=0; LIST_GROUPS=0   # ASOS_WITHOUT: legacy name
 [[ -n "$WITHOUT" ]] && WITHOUT_GIVEN=1
 while [[ $# -gt 0 ]]; do
 	case "$1" in

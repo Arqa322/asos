@@ -34,14 +34,28 @@ alias update='sudo pacman -Syu'
 alias ff='fastfetch'
 alias wall='huilo-wallpaper pick'
 
+# ------------------------------------------------------- AI assistant (ии)
+# ии как установить телеграм  |  команда 2>&1 | ии  |  ии объясни (previous command)
+ии() { HUILO_AI_LAST_CMD="$(fc -ln -2 -2 2>/dev/null | sed 's/^[[:space:]]*//')" huilo-ai "$@"; }
+alias ai='ии'
+# a mistyped command gets a hint instead of a bare "command not found"
+command_not_found_handle() {
+	printf 'bash: %s: команда не найдена\n' "$1" >&2
+	if [[ -t 2 && -z "${HUILO_AI_HINTED:-}" ]] && command -v huilo-ai >/dev/null; then
+		HUILO_AI_HINTED=1
+		printf '  \e[38;2;138;145;165mНе знаете, как сделать? Спросите помощника: ии как …\e[0m\n' >&2
+	fi
+	return 127
+}
+
 # ------------------------------------------------------------ completion
 [[ -r /usr/share/bash-completion/bash_completion ]] && . /usr/share/bash-completion/bash_completion
 if [[ -r /usr/share/fzf/key-bindings.bash ]]; then
 	. /usr/share/fzf/key-bindings.bash
 	. /usr/share/fzf/completion.bash 2>/dev/null
-	export FZF_DEFAULT_OPTS="--height=40% --layout=reverse --border=rounded \
---color=bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8,fg:#cdd6f4,header:#f38ba8 \
---color=info:#cba6f7,pointer:#f5e0dc,marker:#b4befe,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8"
+	# colours: /etc/profile.d/huilo-theme.sh (theme/palette.toml)
+	: "${FZF_DEFAULT_OPTS:=--height=40% --layout=reverse --border=rounded}"
+	export FZF_DEFAULT_OPTS
 fi
 
 # ---------------------------------------------------------------- prompt
@@ -50,7 +64,7 @@ fi
 if [[ "$TERM" != linux ]] && command -v starship >/dev/null; then
 	eval "$(starship init bash)"
 else
-	PS1='\[\e[1;34m\]\u\[\e[0m\]@\[\e[1;35m\]\h\[\e[0m\] \[\e[1;36m\]\w\[\e[0m\] \$ '
+	PS1='\[\e[1;33m\]\u\[\e[0m\]@\[\e[1;31m\]\h\[\e[0m\] \[\e[1;37m\]\w\[\e[0m\] \[\e[33m\]❯\[\e[0m\] '
 fi
 
 # --------------------------------------------------------------- welcome

@@ -9,7 +9,7 @@
 #                             (or any of your own EasyEffects presets)
 #    huilo-eq list            presets
 #    huilo-eq on | off        enable / bypass all effects
-#    huilo-eq menu            pick a preset with wofi (SUPER+Shift+Q)
+#    huilo-eq menu            pick a preset from a menu (SUPER+Shift+M)
 # ============================================================================
 set -uo pipefail
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/huilo"
@@ -49,7 +49,8 @@ case "${1:-open}" in
 	on) ensure; easyeffects -b 2 ;;
 	off) ensure; easyeffects -b 1 ;;
 	menu)
-		choice=$(ls "$PRESETS" 2>/dev/null | sed 's/\.json$//' | wofi --dmenu --prompt "Эквалайзер" --width 320 --height 330) || exit 0
+		choice=$(ls "$PRESETS" 2>/dev/null | sed 's/\.json$//' | while read -r p; do printf '%s\0icon\x1f%s\n' "$p" com.github.wwmm.easyeffects; done |
+			huilo-menu dmenu "Эквалайзер" list -mesg "Пресет применяется сразу. Тонкая настройка: SUPER+Alt+M") || exit 0
 		[[ -n "$choice" ]] && load "$choice" ;;
 	-h|--help) sed -n '2,14p' "$0" ;;
 	*) sed -n '2,14p' "$0"; exit 1 ;;

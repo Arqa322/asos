@@ -1,0 +1,112 @@
+{
+  "$schema": "/etc/xdg/swaync/configSchema.json",
+  "positionX": "right",
+  "positionY": "top",
+  "layer": "overlay",
+  "control-center-layer": "top",
+  "layer-shell": true,
+  "cssPriority": "user",
+  "control-center-margin-top": 8,
+  "control-center-margin-bottom": 8,
+  "control-center-margin-right": 12,
+  "control-center-margin-left": 0,
+  "notification-2fa-action": true,
+  "notification-inline-replies": false,
+  "notification-icon-size": 48,
+  "notification-body-image-height": 120,
+  "notification-body-image-width": 220,
+  "timeout": 8,
+  "timeout-low": 4,
+  "timeout-critical": 0,
+  "fit-to-screen": true,
+  "relative-timestamps": true,
+  "control-center-width": 420,
+  "control-center-height": 720,
+  "notification-window-width": 400,
+  "keyboard-shortcuts": true,
+  "notification-grouping": true,
+  "image-visibility": "when-available",
+  "transition-time": 220,
+  "hide-on-clear": false,
+  "hide-on-action": true,
+  "text-empty": "Уведомлений нет",
+  "script-fail-notify": true,
+  "widgets": [
+    "title",
+    "buttons-grid",
+    "volume",
+    "mpris",
+    "dnd",
+    "notifications"
+  ],
+  "widget-config": {
+    "title": {
+      "text": "Уведомления",
+      "clear-all-button": true,
+      "button-text": "Очистить"
+    },
+    "dnd": {
+      "text": "Не беспокоить"
+    },
+    "mpris": {
+      "autohide": true,
+      "show-album-art": "always"
+    },
+    "volume": {
+      "label": "󰕾",
+      "show-per-app": false
+    },
+    "notifications": {
+      "vexpand": true
+    },
+    "buttons-grid": {
+      "buttons-per-row": 4,
+      "actions": [
+        {
+          "label": "󰖩",
+          "type": "toggle",
+          "active": true,
+          "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && nmcli radio wifi on || nmcli radio wifi off'",
+          "update-command": "sh -c '[ \"$(nmcli radio wifi)\" = enabled ] && echo true || echo false'"
+        },
+        {
+          "label": "󰂯",
+          "type": "toggle",
+          "active": false,
+          "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && bluetoothctl power on || bluetoothctl power off'",
+          "update-command": "sh -c 'bluetoothctl show 2>/dev/null | grep -q \"Powered: yes\" && echo true || echo false'"
+        },
+        {
+          "label": "󰒃",
+          "type": "toggle",
+          "active": false,
+          "command": "sh -c 'sudo -n huilo-zapret toggle || kitty --class huilo-float -e sudo huilo-zapret toggle'",
+          "update-command": "sh -c 'systemctl is-active -q zapret && echo true || echo false'"
+        },
+        {
+          "label": "󰖔",
+          "type": "toggle",
+          "active": false,
+          "command": "huilo-theme night toggle",
+          "update-command": "sh -c 'pgrep -x hyprsunset >/dev/null && echo true || echo false'"
+        },
+        {
+          "label": "󰻤",
+          "command": "sh -c 'swaync-client -cp; huilo-eq menu'"
+        },
+        {
+          "label": "󰴞",
+          "command": "sh -c 'swaync-client -cp; huilo-wallpaper pick'"
+        },
+        {
+          "label": "󰄄",
+          "command": "sh -c 'swaync-client -cp; sleep 0.4; grim -g \"$(slurp)\" - | swappy -f -'"
+        },
+        {
+          "label": "󱘕",
+          "command": "sh -c 'swaync-client -cp; kitty --class huilo-float --title huilo-ai -e huilo-ai'"
+        }
+      ]
+    }
+  }
+}

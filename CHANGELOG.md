@@ -1,0 +1,65 @@
+# Изменения Huilo
+
+Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — по дате выпуска (`ГГГГ.ММ`).
+Как вести этот файл — [docs/MAINTAINING.md](docs/MAINTAINING.md#8-readme-и-changelog).
+
+## [Unreleased]
+
+### Added
+- Собственная тема **Huilo Dusk**: одна палитра (`theme/palette.toml`) и шаблоны (`theme/templates/`), из которых
+  `scripts/make-theme.py` собирает конфиги Hyprland, hyprlock, waybar, rofi, swaync, swayosd, kitty, starship, fzf/gum,
+  GTK 3/4, Qt (qt6ct), безопасного режима sway, меню загрузки, Plymouth и цвета текстовой консоли.
+- Новый интерфейс: «плавающая» панель-острова, лаунчер rofi с превью текущих обоев, меню Huilo (`SUPER+Space`),
+  меню питания плитками, обои сеткой превью, буфер обмена, эмодзи, калькулятор, Wi-Fi-меню (`huilo-menu`),
+  центр уведомлений swaync с быстрыми переключателями, индикатор громкости/яркости swayosd, новый экран блокировки,
+  размытие под панелью и меню, новые анимации, плавающие окна для настроек и утилит.
+- GTK-приложения в стиле libadwaita (adw-gtk3) с янтарным акцентом, шрифт Inter, иконки Papirus, курсор Capitaine;
+  `huilo-theme` (apply / reload / night — ночной свет / status).
+- **ИИ-помощник в терминале** `ии` (`huilo-ai`) для новичков: вопрос своими словами → ответ и готовые команды,
+  которые выполняются только после подтверждения; объяснение вывода (`команда | ии`) и предыдущей команды
+  (`ии объясни`); локальная модель (Ollama) или Claude; `SUPER+I`; подсказка при опечатке в команде.
+- Необязательная группа пакетов `ai` (Ollama, glow).
+- `huilo-update` — обновление установленной системы одной командой.
+- Механизм legacy: `huilo-legacy` и таблица `/usr/share/huilo/legacy.map` — старые имена команд работают с подсказкой.
+- Документация: `docs/ARCHITECTURE.md` (схемы сборки и работы системы, технологии, зависимости),
+  `docs/MAINTAINING.md` (как вносить изменения, правила legacy, README и CHANGELOG), этот файл.
+- CI: проверка темы, тест ИИ-помощника, rofi/kitty/dialog/waybar/swaync/swayosd проверяются настоящими программами.
+
+### Changed
+- Обои перерисованы в палитре Huilo Dusk; «Горы в сумерках» — с янтарным закатом.
+- Фото проекта — **только** на экране загрузки (меню BIOS и Plymouth), из обоев убрано; обои по умолчанию — «Горы в сумерках».
+- `update-installed.sh` обновляет конфиги пофайлово: копия `.bak-<дата>` только у изменённых файлов, личные файлы
+  (`hypr/user.lua`, `kitty/user.conf`, `huilo/sway.conf`) не трогаются.
+- Текстовые меню (dialog) — в цветах Huilo.
+
+### Deprecated
+- `huilo-power` → `huilo-menu power` (старое имя работает до 2027.06).
+- Переменная `ASOS_WITHOUT` → `HUILO_WITHOUT` (старая читается до 2027.06).
+
+### Removed
+- wofi и mako (заменены на rofi и swaync); старые конфиги пользователей сохраняются как `*.bak-<дата>`.
+
+## [2026.11] - 2026-11-12
+
+### Added
+- Сбор журналов `huilo-logs`, слежение за ошибками `huilo-logwatch` с уведомлениями и значком на панели.
+- Эквалайзер EasyEffects с пресетами (`huilo-eq`).
+- Фото проекта на экране загрузки (syslinux и Plymouth).
+- Необязательные группы программ (`--without`, `--minimal`, `huilo-groups`), оригинальные обои,
+  свой fastfetch, starship и kitty.
+- Режимы графики с откатом (`huilo-session`): Hyprland → для ВМ → программная отрисовка → безопасный sway.
+- Скрипты ВМ VirtualBox, установка с официального ISO Arch (`install-online.sh`).
+- Среда для Arduino и NanoPi.
+
+### Changed
+- Проект переименован ASOS → Huilo (команды `asos-*` → `huilo-*`, миграция в `update-installed.sh`).
+- Конфиг Hyprland переведён на Lua (Hyprland 0.57 не читает `hyprland.conf`).
+
+### Fixed
+- Цикл падений Hyprland (логотип → чёрный экран) при старте.
+- Ошибки проверки подписи пакетов при сборке (проверка места, ключей, очистка кэша, повтор).
+
+## [2026.11-initial] - 2026-11-05
+
+### Added
+- Первый образ: Arch Linux + Hyprland, zapret со стратегиями Flowseal, Atom game pack, офис, инструменты администратора.

@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-theme — the look of the desktop (Huilo Dusk)
+#
+#    huilo-theme apply          GTK/GNOME settings, cursor, icons, fonts
+#                               (run at every login by Hyprland and sway)
+#    huilo-theme reload         re-read bar, notification and Hyprland styles
+#    huilo-theme night [on|off|toggle] [K]
+#                               warm "night light" (hyprsunset, default 4500 K)
+#    huilo-theme status         what is in use
+#
+#  The colours themselves live in the repository: theme/palette.toml ->
+#  scripts/make-theme.py -> configs. See docs/MAINTAINING.md.
+# ============================================================================
+set -uo pipefail
+GTK_THEME_NAME=adw-gtk3-dark
+ICONS=Papirus-Dark
+CURSOR=capitaine-cursors-light
+CURSOR_SIZE=24
+FONT="Inter 10"
+MONO="JetBrainsMono Nerd Font 10"
+have() { command -v "$1" >/dev/null 2>&1; }
+
+apply() {
+	if have gsettings; then
+		local s=org.gnome.desktop.interface
+		gsettings set $s color-scheme prefer-dark 2>/dev/null
+		gsettings set $s gtk-theme "$GTK_THEME_NAME" 2>/dev/null
+		gsettings set $s icon-theme "$ICONS" 2>/dev/null
+		gsettings set $s cursor-theme "$CURSOR" 2>/dev/null
+		gsettings set $s cursor-size "$CURSOR_SIZE" 2>/dev/null
+		gsettings set $s font-name "$FONT" 2>/dev/null
+		gsettings set $s document-font-name "$FONT" 2>/dev/null
+		gsettings set $s monospace-font-name "$MONO" 2>/dev/null
+		gsettings set $s accent-color orange 2>/dev/null   # GNOME 47+: nearest to amber
+		gsettings set org.gnome.desktop.wm.preferences button-layout ':close' 2>/dev/null
+	fi
+	if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && have hyprctl; then
+		hyprctl setcursor "$CURSOR" "$CURSOR_SIZE" >/dev/null 2>&1
+	elif [[ -n "${SWAYSOCK:-}" ]] && have swaymsg; then
+		swaymsg "seat * xcursor_theme $CURSOR $CURSOR_SIZE" >/dev/null 2>&1
+	fi
+	return 0
+}
+
+reload() {
+	pkill -SIGUSR2 -x waybar 2>/dev/null           # waybar re-reads config + style
+	have swaync-client && swaync-client -rs >/dev/null 2>&1
+	if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then hyprctl reload >/dev/null 2>&1
+	elif [[ -n "${SWAYSOCK:-}" ]]; then swaymsg reload >/dev/null 2>&1; fi
+	apply
+}
+
+night() {
+	local want=${1:-toggle} temp=${2:-4500}
+	have hyprsunset || { notify-send -a Huilo "Ночной свет" "Нужен пакет hyprsunset (только Hyprland)"; return 1; }
+	if [[ "$want" == toggle ]]; then
+		if pgrep -x hyprsunset >/dev/null; then want=off; else want=on; fi
+	fi
+	case "$want" in
+		on)
+			pkill -x hyprsunset 2>/dev/null
+			setsid -f hyprsunset -t "$temp" >/dev/null 2>&1
+			notify-send -a Huilo -t 2000 "Ночной свет" "Включён (${temp} K)" ;;
+		off)
+			pkill -x hyprsunset 2>/dev/null
+			notify-send -a Huilo -t 2000 "Ночной свет" "Выключен" ;;
+		*) echo "usage: huilo-theme night [on|off|toggle] [K]" >&2; return 1 ;;
+	esac
+}
+
+status() {
+	echo "GTK theme:   $(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null || echo '?')"
+	echo "colour mode: $(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null || echo '?')"
+	echo "icons:       $(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null || echo '?')"
+	echo "cursor:      $(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null || echo '?')"
+	echo "font:        $(gsettings get org.gnome.desktop.interface font-name 2>/dev/null || echo '?')"
+	echo "night light: $(pgrep -x hyprsunset >/dev/null && echo on || echo off)"
+	for f in hypr/theme.lua waybar/style.css swaync/style.css swayosd/style.css kitty/colors.conf; do
+		if [[ -f "$HOME/.config/$f" ]]; then echo "ok   ~/.config/$f"; else echo "нет  ~/.config/$f (huilo-update вернёт)"; fi
+	done
+}
+
+case "${1:-apply}" in
+	apply) apply ;;
+	reload) reload ;;
+	night) shift; night "$@" ;;
+	status) status ;;
+	-h|--help|help) sed -n '2,15p' "$0" ;;
+	*) sed -n '2,15p' "$0" >&2; exit 1 ;;
+esac

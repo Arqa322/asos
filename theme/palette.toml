@@ -1,0 +1,54 @@
+# ============================================================================
+#  Huilo Dusk — the colour palette of Huilo (single source of truth)
+#
+#  Every themed config is rendered from theme/templates/ by
+#      python3 scripts/make-theme.py
+#  Change a colour here, run the script, commit both. CI fails if the
+#  generated files are out of date.
+#
+#  Mood: amber light over dusky mountains — warm accents on deep ink-blue.
+# ============================================================================
+
+[colors]
+# backgrounds, darkest -> lightest
+ink0 = "#0b0d12"     # deepest background (lock screen, greeter)
+ink1 = "#11141b"     # window / terminal background
+ink2 = "#181c25"     # panels, cards, bar islands
+ink3 = "#222734"     # hover, selected rows, inputs
+ink4 = "#2e3445"     # borders, separators
+# text
+mist = "#8a91a5"     # muted text, placeholders
+fog  = "#b9bfcc"     # secondary text
+snow = "#ece7dc"     # primary text (warm white)
+# accents
+amber   = "#f2a33a"  # primary accent: focus, selection, active workspace
+honey   = "#ffc978"  # light accent
+ember   = "#ff6b4a"  # secondary accent: gradients, highlights
+dusk    = "#6f8fc7"  # blue
+glacier = "#7cc4d8"  # cyan
+pine    = "#8bc78f"  # green: success, zapret on
+berry   = "#f0566a"  # red: errors, critical
+heather = "#b08ad8"  # violet
+
+[terminal]
+# the 16 ANSI colours (kitty, text console, fastfetch, starship)
+black   = "#222734"
+red     = "#f0566a"
+green   = "#8bc78f"
+yellow  = "#f2a33a"
+blue    = "#6f8fc7"
+magenta = "#b08ad8"
+cyan    = "#7cc4d8"
+white   = "#b9bfcc"
+bright_black   = "#3a4256"
+bright_red     = "#ff7a8a"
+bright_green   = "#a6dba9"
+bright_yellow  = "#ffc978"
+bright_blue    = "#93aee0"
+bright_magenta = "#c9a7ea"
+bright_cyan    = "#9fd8e6"
+bright_white   = "#ece7dc"
+
+[fonts]
+ui = "Inter"
+mono = "JetBrainsMono Nerd Font"

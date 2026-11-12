@@ -22,6 +22,7 @@ declare -A DESC=(
 	[communication]="Thunderbird, Telegram, Discord, qBittorrent"
 	[media]="OBS Studio, GIMP"
 	[vscode]="VS Code (Code - OSS)"
+	[ai]="локальная нейросеть для ИИ-помощника: Ollama (модель скачивается при настройке), glow"
 	[games]="Atom game pack: Steam, Lutris, Wine, GameMode, MangoHud, 32-бит драйверы"
 	[arduino]="Arduino IDE 2, arduino-cli, PlatformIO, esptool, OpenOCD, логический анализатор"
 	[nanopi]="кросс-компилятор aarch64, qemu-user, rkdeveloptool, xfel, прошивка SD"
@@ -33,7 +34,7 @@ declare -A DESC=(
 	[zapret]="обход DPI: zapret + стратегии Flowseal"
 	[aur]="AUR-помощник yay"
 )
-ORDER=(office communication media vscode games arduino nanopi monitoring nettools disktools virt security zapret aur)
+ORDER=(office communication media vscode ai games arduino nanopi monitoring nettools disktools virt security zapret aur)
 
 resolve() { # aliases/commas -> unique tags, one per line
 	local w

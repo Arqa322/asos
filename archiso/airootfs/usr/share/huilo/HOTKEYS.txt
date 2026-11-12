@@ -1,38 +1,55 @@
- Huilo — горячие клавиши Hyprland(q — закрыть)
+ Huilo — горячие клавиши (q — закрыть)
  ===========================================================
+ Главное
+ -----------------------------------------------------------
+ SUPER + Space          меню Huilo: все настройки и утилиты в одном списке
+ SUPER + D              приложения (поиск по названию)
+ SUPER + I              ИИ-помощник: спросите своими словами
  SUPER + Enter          терминал (kitty)
- SUPER + D              меню приложений (wofi)
+ SUPER + N              центр уведомлений;  SUPER + Alt + N — не беспокоить
+ SUPER + Backspace      питание: блокировка, сон, выход, перезагрузка, выключение
+ SUPER + F1             эта подсказка
+
+ Окна
+ -----------------------------------------------------------
  SUPER + Q              закрыть окно
  SUPER + F              полноэкранный режим
  SUPER + V              плавающее окно
- SUPER + E              файловый менеджер (Thunar)
- SUPER + B              браузер (Firefox)
- SUPER + O              LibreOffice
- SUPER + A              Arduino IDE 2
- SUPER + Shift + A      помощник Arduino (порты, загрузка, монитор, ядра)
- SUPER + Shift + N      инструменты NanoPi (microSD, UART, поиск, maskrom)
- SUPER + Z              меню zapret (стратегии, game filter, Atom)
- SUPER + C              история буфера обмена
- SUPER + L              заблокировать экран
- SUPER + Esc            системный монитор (btop)
- SUPER + Shift + S      скриншот области (с редактором)
- Print                  скриншот экрана в буфер
- SUPER + 1..0           рабочие столы
- SUPER + Shift + 1..0   перенести окно на рабочий стол
+ SUPER + P / J          псевдо-плитка / сменить направление деления
  SUPER + стрелки        фокус;  + Shift — переместить окно
  SUPER + ЛКМ / ПКМ      двигать / менять размер окна
- SUPER + Backspace      меню питания (блокировка, выход, перезагрузка)
- SUPER + W              выбрать обои (с предпросмотром),  + Shift — следующие
- SUPER + Shift + M      эквалайзер: выбрать пресет;  SUPER + Alt + M — окно эквалайзера
+ SUPER + 1..0           рабочие столы;  + Shift — перенести окно туда
+ SUPER + S              «карман» (скрытый рабочий стол);  SUPER + Alt + S — убрать окно в карман
+ SUPER + колесо мыши    листать рабочие столы
+
+ Программы и инструменты
+ -----------------------------------------------------------
+ SUPER + E              файлы (Thunar)
+ SUPER + B              браузер (Firefox)
+ SUPER + O              LibreOffice
+ SUPER + Z              меню zapret (стратегии, game filter, Atom)
+ SUPER + C              история буфера обмена (Shift+Del — удалить строку)
+ SUPER + .              эмодзи;  SUPER + = — калькулятор
+ SUPER + W              обои (сетка превью);  SUPER + Shift + W — следующие
+ SUPER + Shift + M      эквалайзер: пресет;  SUPER + Alt + M — окно эквалайзера
  SUPER + Shift + L      последние серьёзные ошибки системы
+ SUPER + Esc            системный монитор (btop)
+ SUPER + A              Arduino IDE 2;  SUPER + Shift + A — помощник Arduino
+ SUPER + Shift + N      инструменты NanoPi (microSD, UART, поиск, maskrom)
+ SUPER + Shift + S      скриншот области (с редактором);  Print — весь экран в буфер
+ SUPER + L              заблокировать экран
  SUPER + Shift + E      выйти из сеанса
  Alt + Shift            раскладка EN/RU
+ Клавиши громкости/яркости показывают индикатор на экране
 
  Терминал
  -----------------------------------------------------------
+ ии                     ИИ-помощник (ии как установить telegram; команда | ии; ии объясни)
+ ии setup               выбрать «мозг»: локальная модель (Ollama) или Claude
+ huilo-menu             меню: apps | hub | power | clipboard | emoji | calc | wifi
+ huilo-theme            оформление: apply | reload | night toggle | status
  huilo-zapret           статус zapret (menu, list, set, game, ipset, atom, check)
- huilo-game <cmd>       запуск игры с gamemode + MangoHud
-                        (в Steam: huilo-game %command%)
+ huilo-game <cmd>       запуск игры с gamemode + MangoHud (в Steam: huilo-game %command%)
  huilo-arduino          Arduino: doctor, boards, upload, monitor, setup esp32 ...
  huilo-nanopi           NanoPi: boards, find, console, flash, share, chroot ...
  pio                    PlatformIO Core;  esptool / mpremote — ESP32 и MicroPython
@@ -42,6 +59,8 @@
  huilo-eq preset bass   эквалайзер: balanced bass bright voice games night flat
  huilo-groups list      группы программ; sudo huilo-groups add|remove office,games ...
  huilo-wallpaper        обои: pick | next | random | set FILE (свои — в ~/Изображения/Wallpapers)
+ huilo-update           обновить скрипты и настройки Huilo (пакеты: sudo pacman -Syu)
+ huilo-legacy --list    старые имена команд, которые ещё работают
  ff                     fastfetch — сводка о системе
  huilo-session --set M  режим графики: hyprland-vm | hyprland-software | sway-software
  sudo huilo-install     установка Huilo на диск

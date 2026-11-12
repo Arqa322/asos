@@ -1,0 +1,25 @@
+/* generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy) */
+/* Huilo accents for GTK 3 apps (theme adw-gtk3-dark). Colours: theme/palette.toml */
+@define-color accent_color #ffc978;
+@define-color accent_bg_color #f2a33a;
+@define-color accent_fg_color @{ink0};
+@define-color window_bg_color @{ink1};
+@define-color window_fg_color #ece7dc;
+@define-color view_bg_color @{ink1};
+@define-color view_fg_color #ece7dc;
+@define-color headerbar_bg_color @{ink2};
+@define-color headerbar_fg_color #ece7dc;
+@define-color headerbar_backdrop_color @{ink1};
+@define-color headerbar_border_color @{ink4};
+@define-color sidebar_bg_color @{ink2};
+@define-color sidebar_fg_color #ece7dc;
+@define-color card_bg_color rgba(236, 231, 220, 0.04);
+@define-color card_fg_color #ece7dc;
+@define-color popover_bg_color @{ink2};
+@define-color popover_fg_color #ece7dc;
+@define-color dialog_bg_color @{ink2};
+@define-color dialog_fg_color #ece7dc;
+@define-color destructive_bg_color #f0566a;
+@define-color success_color #8bc78f;
+@define-color warning_color #ffc978;
+@define-color error_color #f0566a;

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Arduino: помощник Huilo
 Comment=Диагностика портов, загрузка скетчей, монитор, ядра ESP32/RP2040/STM32
-Exec=kitty --title huilo-arduino -e huilo-arduino menu
+Exec=kitty --class huilo-float --title huilo-arduino -e huilo-arduino menu
 Icon=applications-electronics
 Terminal=false
 Type=Application

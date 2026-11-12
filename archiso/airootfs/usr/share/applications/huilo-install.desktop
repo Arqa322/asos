@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Установить Huilo на диск
 Comment=Установка live-системы Huilo на жёсткий диск
-Exec=kitty --title huilo-install -e sudo huilo-install
+Exec=kitty --class huilo-float --title huilo-install -e sudo huilo-install
 Icon=system-software-install
 Terminal=false
 Type=Application

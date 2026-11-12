@@ -9,8 +9,11 @@
 #  * migrates ASOS -> Huilo: commands, services, zapret config (values kept),
 #    boot entries, per-user state
 #  * scripts, wallpapers, safe graphics mode, Plymouth boot splash, equalizer
-#    (EasyEffects), log tools, console look
-#  * every user's desktop configs are replaced; old ones kept as *.bak-<date>
+#    (EasyEffects), log tools, console look, the Huilo Dusk theme (rofi menus,
+#    swaync notifications, swayosd), the AI assistant (ии), legacy names
+#  * every user's desktop configs are replaced file by file; a changed file is
+#    kept as <file>.bak-<date>; personal files (user.lua, kitty/user.conf,
+#    huilo/sway.conf, ai.conf) are never touched
 #  * restarts the tty1 session at the end
 # ============================================================================
 set -euo pipefail
@@ -33,9 +36,11 @@ A="$SRC/archiso/airootfs"
 [[ $got == 1 && -d "$A/usr/local/bin" ]] || { echo "download failed" >&2; exit 1; }
 
 # ------------------------------------------------------------- packages ---
-info "пакеты: безопасный режим, оформление, экран загрузки, эквалайзер"
+info "пакеты: безопасный режим, оформление, экран загрузки, эквалайзер, помощник"
 pkgs=(sway foot drm-info mesa-utils awww starship fastfetch kbd terminus-font jq
-	plymouth easyeffects lsp-plugins-lv2 calf pipewire-audio)
+	plymouth easyeffects lsp-plugins-lv2 calf pipewire-audio
+	rofi rofi-emoji rofi-calc wtype swaync swayosd hyprsunset adw-gtk-theme capitaine-cursors
+	papirus-icon-theme inter-font dconf gum qt6ct)
 case "$(systemd-detect-virt --vm 2>/dev/null || true)" in
 	oracle) pkgs+=(virtualbox-guest-utils) ;;
 	vmware) pkgs+=(open-vm-tools) ;;
@@ -72,7 +77,15 @@ fi
 
 # ---------------------------------------------------------- system files ---
 info "скрипты и общие файлы"
-install -m 0755 "$A"/usr/local/bin/* /usr/local/bin/
+for f in "$A"/usr/local/bin/*; do   # old names are symlinks to huilo-legacy
+	if [[ -L "$f" ]]; then rm -f "/usr/local/bin/$(basename "$f")"; cp -a "$f" /usr/local/bin/
+	else install -m 0755 "$f" /usr/local/bin/; fi
+done
+rm -rf /usr/local/lib/huilo/legacy && mkdir -p /usr/local/lib/huilo && cp -a "$A/usr/local/lib/huilo/legacy" /usr/local/lib/huilo/
+install -Dm0644 -t /etc/profile.d "$A"/etc/profile.d/huilo-*.sh
+mkdir -p /usr/share/rofi/themes /usr/share/qt6ct/colors
+install -m 0644 "$A"/usr/share/rofi/themes/huilo*.rasi /usr/share/rofi/themes/
+install -m 0644 "$A"/usr/share/qt6ct/colors/huilo.conf /usr/share/qt6ct/colors/
 mkdir -p /usr/share/huilo /usr/share/backgrounds /usr/share/plymouth/themes
 cp -a "$A/usr/share/huilo/." /usr/share/huilo/
 cp -a "$A/usr/share/applications/." /usr/share/applications/
@@ -115,6 +128,19 @@ done
 
 # ------------------------------------------------------------- users ---
 stamp=$(date +%Y%m%d-%H%M%S)
+# what Huilo owns in a home directory (keep in sync with etc/skel, see docs/MAINTAINING.md)
+MANAGED=(
+	.config/hypr/hyprland.lua .config/hypr/theme.lua .config/hypr/hypridle.conf .config/hypr/hyprlock.conf
+	.config/waybar/config.jsonc .config/waybar/style.css
+	.config/rofi/config.rasi .config/swaync/config.json .config/swaync/style.css
+	.config/swayosd/style.css .config/swayosd/config.toml
+	.config/kitty/kitty.conf .config/kitty/colors.conf
+	.config/gtk-3.0/settings.ini .config/gtk-3.0/gtk.css .config/gtk-4.0/settings.ini .config/gtk-4.0/gtk.css
+	.config/qt6ct/qt6ct.conf
+	.config/fastfetch/config.jsonc .config/fastfetch/huilo-logo.txt .config/starship.toml
+	.bashrc .bash_profile
+)
+SEEDED=(.config/hypr/user.lua .config/kitty/user.conf .config/huilo/sway.conf)
 while IFS=: read -r user _ uid gid _ home shell; do
 	(( uid >= 1000 && uid < 60000 )) || continue
 	[[ -d "$home" && "$shell" != */nologin ]] || continue
@@ -122,33 +148,36 @@ while IFS=: read -r user _ uid gid _ home shell; do
 	huilo-user-groups "$user" || true
 	[[ -d "$home/.local/state/asos" && ! -e "$home/.local/state/huilo" ]] && mv "$home/.local/state/asos" "$home/.local/state/huilo"
 	[[ -d "$home/.config/asos" && ! -e "$home/.config/huilo" ]] && mv "$home/.config/asos" "$home/.config/huilo"
-	for d in .config/hypr .config/waybar .config/kitty .config/fastfetch .config/mako .config/starship.toml .bashrc; do
-		[[ -e "$home/$d" ]] && cp -a "$home/$d" "$home/$d.bak-$stamp"
-	done
-	mkdir -p "$home/.config/hypr" "$home/.config/waybar" "$home/.config/huilo" "$home/.config/kitty" \
-		"$home/.config/fastfetch" "$home/.config/mako" "$home/.local/share/easyeffects/output"
 	rm -f "$home/.config/hypr/hyprland.conf" "$home/.config/fastfetch/asos-logo.txt"
-	install -m 0644 "$A/etc/skel/.config/hypr/hyprland.lua" "$A/etc/skel/.config/hypr/hypridle.conf" \
-		"$A/etc/skel/.config/hypr/hyprlock.conf" "$home/.config/hypr/"
-	[[ -f "$home/.config/hypr/user.lua" ]] || install -m 0644 "$A/etc/skel/.config/hypr/user.lua" "$home/.config/hypr/"
 	if [[ -f "$home/.config/hypr/user.conf" ]]; then
 		mv "$home/.config/hypr/user.conf" "$home/.config/hypr/user.conf.old"
 		warn "  ~/.config/hypr/user.conf (старый формат) переименован в user.conf.old — перенесите свои настройки в user.lua"
 	fi
-	install -m 0644 "$A/etc/skel/.config/waybar/config.jsonc" "$A/etc/skel/.config/waybar/style.css" "$home/.config/waybar/"
-	install -m 0644 "$A/etc/skel/.config/kitty/kitty.conf" "$home/.config/kitty/"
-	install -m 0644 "$A/etc/skel/.config/mako/config" "$home/.config/mako/"
-	install -m 0644 "$A/etc/skel/.config/fastfetch/config.jsonc" "$A/etc/skel/.config/fastfetch/huilo-logo.txt" "$home/.config/fastfetch/"
-	install -m 0644 "$A/etc/skel/.config/starship.toml" "$home/.config/starship.toml"
-	install -m 0644 "$A/etc/skel/.bashrc" "$A/etc/skel/.bash_profile" "$home/"
-	[[ -f "$home/.config/huilo/sway.conf" ]] || install -m 0644 "$A/etc/skel/.config/huilo/sway.conf" "$home/.config/huilo/"
-	for p in "$A"/etc/skel/.local/share/easyeffects/output/*.json; do
-		[[ -f "$home/.local/share/easyeffects/output/$(basename "$p")" ]] || install -m 0644 "$p" "$home/.local/share/easyeffects/output/"
+	# replaced by the new look (rofi, swaync): kept as backups
+	for old in .config/mako/config .config/wofi/config .config/wofi/style.css; do
+		[[ -f "$home/$old" ]] && mv "$home/$old" "$home/$old.bak-$stamp"
+	done
+	# managed files: replaced; a file the user changed is kept as .bak-<date>
+	for f in "${MANAGED[@]}"; do
+		[[ -f "$A/etc/skel/$f" ]] || continue
+		mkdir -p "$home/$(dirname "$f")"
+		if [[ -f "$home/$f" ]] && ! cmp -s "$A/etc/skel/$f" "$home/$f"; then cp -a "$home/$f" "$home/$f.bak-$stamp"; fi
+		install -m 0644 "$A/etc/skel/$f" "$home/$f"
+		chown "$uid:$gid" "$home/$f"
+	done
+	# personal files: only created when missing
+	for f in "${SEEDED[@]}" $(cd "$A/etc/skel" && ls .local/share/easyeffects/output/*.json); do
+		[[ -f "$A/etc/skel/$f" && ! -e "$home/$f" ]] || continue
+		mkdir -p "$home/$(dirname "$f")"
+		install -m 0644 "$A/etc/skel/$f" "$home/$f"
+		chown "$uid:$gid" "$home/$f"
 	done
 	rm -f "$home/.local/state/huilo/session/last-ok"
-	chown -R "$uid:$gid" "$home/.config/hypr" "$home/.config/waybar" "$home/.config/huilo" "$home/.config/kitty" \
-		"$home/.config/fastfetch" "$home/.config/mako" "$home/.config/starship.toml" "$home/.local/share/easyeffects" \
-		"$home/.bash_profile" "$home/.bashrc"
+	for d in .config .config/hypr .config/waybar .config/kitty .config/rofi .config/swaync .config/swayosd \
+		.config/gtk-3.0 .config/gtk-4.0 .config/qt6ct .config/fastfetch .config/huilo .local .local/share \
+		.local/share/easyeffects .local/share/easyeffects/output; do
+		[[ -d "$home/$d" ]] && chown "$uid:$gid" "$home/$d"
+	done
 	[[ -d "$home/.local/state/huilo" ]] && chown -R "$uid:$gid" "$home/.local/state/huilo"
 done </etc/passwd
 

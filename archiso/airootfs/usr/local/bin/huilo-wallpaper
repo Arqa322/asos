@@ -3,7 +3,7 @@
 #  huilo-wallpaper — wallpapers for Hyprland and the sway safe mode
 #
 #    huilo-wallpaper              restore the last wallpaper (used at login)
-#    huilo-wallpaper pick         choose with previews (SUPER+W)
+#    huilo-wallpaper pick         choose from a grid of previews (SUPER+W)
 #    huilo-wallpaper next | prev | random
 #    huilo-wallpaper set FILE     any image (jpg/png/webp)
 #    huilo-wallpaper list
@@ -48,6 +48,10 @@ apply() {
 	local f=$1
 	[[ -f "$f" ]] || { echo "нет файла: $f" >&2; return 1; }
 	ln -sfn "$f" "$STATE/current"
+	# small copy for the launcher (huilo-menu) and the lock screen
+	local thumb="$SYS/thumbs/$(basename "$f")"
+	[[ -f "$thumb" ]] || thumb=$f
+	ln -sfn "$thumb" "$STATE/thumb"
 	if [[ -z "${HUILO_SAFE_SESSION:-}" ]] && command -v awww >/dev/null; then
 		if ! awww query >/dev/null 2>&1; then
 			pkill -x swaybg 2>/dev/null
@@ -75,17 +79,18 @@ step() { # +1 / -1 through the list
 
 pick() {
 	mapfile -t files < <(all_files)
-	local lines=() f thumb choice t
-	for f in "${files[@]}"; do
+	local f thumb choice t cur sel=0 i=0
+	cur=$(current)
+	choice=$(for f in "${files[@]}"; do
 		thumb="$SYS/thumbs/$(basename "$f")"
 		[[ -f "$thumb" ]] || thumb=$f
-		lines+=("img:$thumb:text:$(title_of "$f")")
-	done
-	choice=$(printf '%s\n' "${lines[@]}" | wofi --dmenu --allow-images --prompt "Обои" \
-		--width 560 --height 640 -D image_size=200 -D dynamic_lines=false 2>/dev/null) || return 0
-	t=${choice##*:text:}
+		printf '%s\0icon\x1f%s\n' "$(title_of "$f")" "$thumb"
+	done | {
+		for f in "${files[@]}"; do [[ "$f" == "$cur" ]] && sel=$i; i=$((i + 1)); done
+		huilo-menu dmenu "Обои" grid -selected-row "$sel" -mesg "Свои картинки: папка ~/Изображения/Wallpapers"
+	}) || return 0
 	for f in "${files[@]}"; do
-		[[ "$(title_of "$f")" == "$t" ]] && { apply "$f"; return; }
+		[[ "$(title_of "$f")" == "$choice" ]] && { apply "$f"; return; }
 	done
 }
 

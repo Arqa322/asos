@@ -1,5 +1,0 @@
-window { background-color: rgba(30, 30, 46, 0.95); border: 2px solid #89b4fa; border-radius: 10px; font-family: "JetBrainsMono Nerd Font"; }
-#input { margin: 8px; padding: 6px; border-radius: 6px; border: none; background: #313244; color: #cdd6f4; }
-#entry { padding: 6px; border-radius: 6px; color: #cdd6f4; }
-#entry:selected { background-color: #89b4fa; color: #1e1e2e; }
-#text { color: inherit; }

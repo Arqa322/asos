@@ -3,10 +3,10 @@ name: Build Huilo ISO
 on:
   push:
     branches: ["claude/**", "main"]
-    paths: ["archiso/**", "scripts/**", "vm/**", "build.sh", ".github/workflows/**"]
+    paths: ["archiso/**", "scripts/**", "theme/**", "vm/**", "build.sh", ".github/workflows/**"]
     tags: ["v*"]
   pull_request:
-    paths: ["archiso/**", "scripts/**", "vm/**", "build.sh", ".github/workflows/**"]
+    paths: ["archiso/**", "scripts/**", "theme/**", "vm/**", "build.sh", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       release:
@@ -36,6 +36,12 @@ jobs:
           if ($e.Count) { $e | ForEach-Object { Write-Error ("{0}:{1} {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message) }; exit 1 }
       - name: Executables keep their mode in the ISO (file_permissions)
         run: scripts/check-permissions.sh
+      - name: Theme files are generated from theme/palette.toml
+        run: |
+          python3 scripts/make-theme.py --check
+          if grep -rIl --exclude-dir=Arduino '@{[a-z_]*\(\.[a-z]*\)\?}' archiso/; then echo "::error::unrendered theme placeholders"; exit 1; fi
+      - name: AI assistant (huilo-ai) against a mock model server
+        run: scripts/tests/test-huilo-ai.sh
       - name: Optional package groups
         run: |
           full=$(scripts/pkg-select.sh archiso/packages.x86_64 | wc -l)
@@ -69,14 +75,17 @@ jobs:
     timeout-minutes: 20
     container: archlinux/archlinux:latest
     steps:
-      - name: Install Hyprland, fastfetch, starship, sway
-        run: pacman -Syu --noconfirm --needed git hyprland fastfetch starship sway mesa ttf-jetbrains-mono-nerd plymouth jq
+      - name: Install Hyprland, fastfetch, starship, sway, rofi, waybar, swaync, swayosd, kitty
+        run: |
+          pacman -Syu --noconfirm --needed git hyprland fastfetch starship sway mesa ttf-jetbrains-mono-nerd plymouth jq \
+            rofi waybar swaync swayosd kitty dialog gum dbus util-linux inter-font papirus-icon-theme adw-gtk-theme
       - uses: actions/checkout@v5
       - name: Prepare a test home with the Huilo skel
         run: |
           useradd -m tester
           cp -a archiso/airootfs/etc/skel/. /home/tester/
           cp -a archiso/airootfs/usr/share/huilo /usr/share/
+          cp -a archiso/airootfs/usr/share/rofi/themes/. /usr/share/rofi/themes/
           chown -R tester:tester /home/tester
           install -d -m 0700 -o tester /tmp/xdg
       - name: Hyprland --verify-config (hyprland.lua)
@@ -108,6 +117,47 @@ jobs:
             jq -e '.output.plugins_order == ["equalizer#0"] and (.output["equalizer#0"].left | length) == .output["equalizer#0"]["num-bands"]' "$f" >/dev/null \
               || { echo "::error::bad preset $f"; exit 1; }
           done
+      - name: rofi reads the Huilo themes and settings
+        run: |
+          for t in huilo huilo-list huilo-power huilo-grid; do
+            out=$(su tester -c "rofi -theme $t -dump-theme" 2>&1) || { echo "$out"; echo "::error::rofi failed on $t"; exit 1; }
+            if echo "$out" | grep -q -i -E 'failed to parse|error'; then echo "$out" | head -20; echo "::error::rofi theme $t"; exit 1; fi
+            echo "$out" | grep -q 'imagebox\|listview' || { echo "::error::rofi theme $t looks empty"; exit 1; }
+            echo "ok: $t"
+          done
+          cfg=$(su tester -c 'rofi -dump-config' 2>&1)
+          echo "$cfg" | grep -q 'icon-theme: "Papirus-Dark"' || { echo "$cfg" | head -40; echo "::error::rofi ignored ~/.config/rofi/config.rasi"; exit 1; }
+      - name: kitty accepts kitty.conf + colors.conf
+        run: |
+          out=$(su tester -c 'kitty +runpy "from kitty.config import load_config; load_config(\"/home/tester/.config/kitty/kitty.conf\")"' 2>&1) || true
+          echo "$out"
+          if echo "$out" | grep -q -i -E 'unknown|invalid|ignoring|error'; then echo "::error::kitty config problem"; exit 1; fi
+      - name: dialog accepts the Huilo colours (dialogrc)
+        run: |
+          out=$(TERM=xterm timeout 5 script -q -e -c 'DIALOGRC=archiso/airootfs/usr/share/huilo/theme/dialogrc dialog --infobox test 3 20' /dev/null 2>&1) || true
+          if echo "$out" | grep -q -E 'unknown variable|syntax error|expected|Parse error'; then echo "$out"; echo "::error::dialogrc"; exit 1; fi
+          echo ok
+      - name: waybar, swaync and swayosd start with the Huilo styles (headless sway)
+        run: |
+          cp "$(command -v sway)" /usr/local/bin/sway-nocap
+          printf 'output HEADLESS-1 resolution 1920x1080\n' >/tmp/test-sway.conf
+          su tester -c 'export XDG_RUNTIME_DIR=/tmp/xdg WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1; dbus-run-session -- sh -c "
+            sway-nocap -c /tmp/test-sway.conf >/tmp/sway.log 2>&1 &
+            for i in \$(seq 1 50); do [ -S /tmp/xdg/wayland-1 ] && break; sleep 0.2; done
+            export WAYLAND_DISPLAY=wayland-1 GSK_RENDERER=cairo
+            timeout 8 waybar -c /usr/share/huilo/sway/waybar.jsonc -s ~/.config/waybar/style.css >/tmp/waybar.log 2>&1
+            timeout 6 swaync -c ~/.config/swaync/config.json -s ~/.config/swaync/style.css >/tmp/swaync.log 2>&1
+            timeout 5 swayosd-server >/tmp/swayosd.log 2>&1
+            true"' || true
+          bad=0
+          for f in waybar swaync swayosd; do
+            echo "::group::$f"; cat /tmp/$f.log; echo "::endgroup::"
+            if grep -q -i -E '\.css:[0-9]|theme parser error|is not a valid|not a valid property|unknown module|error parsing|parse error|invalid config|unknown property' /tmp/$f.log; then
+              echo "::error::$f reported a config/style problem"; bad=1
+            fi
+          done
+          grep -q -i 'wayland' /tmp/sway.log || cat /tmp/sway.log
+          exit $bad
       - name: sway --validate (safe graphics mode)
         # the packaged binary carries file capabilities, which an unprivileged
         # container refuses to exec; a plain copy is enough to parse the config

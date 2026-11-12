@@ -1,0 +1,9 @@
+# Huilo: on-screen display for volume and brightness keys
+[server]
+top_margin = 0.88
+max_volume = 150
+show_percentage = true
+min_brightness = 5
+duration = 1200
+
+[client]

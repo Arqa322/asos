@@ -1,0 +1,10 @@
+/* Huilo menus (power, equaliser, clipboard, Wi-Fi, Huilo hub) */
+@import "huilo"
+
+window   { width: 460px; }
+mainbox  { orientation: vertical; children: [ "listbox" ]; }
+listbox  { padding: 16px; spacing: 12px; }
+inputbar { children: [ "prompt", "entry" ]; padding: 11px 14px; }
+listview { lines: 9; }
+element  { padding: 9px 12px; }
+element-icon { size: 22px; }

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Zapret (обход DPI)
 Comment=Стратегии Flowseal, Game Filter, Atom game pack
-Exec=kitty --title huilo-zapret -e huilo-zapret menu
+Exec=kitty --class huilo-float --title huilo-zapret -e huilo-zapret menu
 Icon=network-vpn
 Terminal=false
 Type=Application

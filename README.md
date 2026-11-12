@@ -4,7 +4,8 @@ Live/установочный ISO на базе **Arch Linux** (профиль `
 
 | Компонент | Что внутри |
 |---|---|
-| **Рабочий стол** | Hyprland, Waybar, Wofi, Mako, Kitty, Hyprlock/Hypridle, Thunar, PipeWire, NetworkManager, Bluetooth, тёмная тема, раскладка EN/RU (`Alt+Shift`) |
+| **Рабочий стол** | Hyprland, Waybar, rofi (меню), swaync (уведомления), swayosd, Kitty, Hyprlock/Hypridle, Thunar, PipeWire, NetworkManager, Bluetooth, собственная тема **Huilo Dusk**, раскладка EN/RU (`Alt+Shift`) |
+| **ИИ-помощник** | `ии` в терминале (`SUPER+I`): вопрос своими словами → понятный ответ и готовые команды, которые выполняются только после подтверждения; локальная модель (Ollama) или Claude |
 | **Обход DPI** | [zapret](https://github.com/bol-van/zapret) (`nfqws` + nftables) со **всеми стратегиями [Flowseal](https://github.com/Flowseal/zapret-discord-youtube)** (`general`, `ALT`…`ALT13`, `SIMPLE FAKE`, `FAKE TLS AUTO` …), Game Filter и IPSet Filter как в оригинале. Служба включена сразу. |
 | **Atom game pack** | Steam, Lutris, Wine-staging (+mono/gecko, winetricks), Prism Launcher, GameMode, MangoHud, Gamescope, Mesa/Vulkan 64+32 бит (AMD/Intel/Nouveau), ntsync, сетевые твики (BBR), `huilo-game` + список игровых доменов/IP для zapret (Steam, Epic, EA, Ubisoft, Battle.net, Riot, Roblox, Minecraft, FACEIT, Twitch…) |
 | **Офис** | LibreOffice (рус.), Thunderbird, Zathura (PDF), Xournal++, Mousepad, Qalculate, KeePassXC, GIMP, Simple Scan |
@@ -22,8 +23,14 @@ scripts/build-aur.sh        сборка AUR-пакетов (Arduino IDE, rkdeve
 scripts/fetch-arduino.sh    предустановка ядер и библиотек Arduino в /etc/skel
 scripts/check-packages.py   проверка списков пакетов по актуальным репозиториям Arch (без сборки)
 scripts/pkg-select.sh       необязательные группы пакетов (--without / --minimal)
-scripts/make-wallpapers.py  генератор обоев и фона меню загрузки
+scripts/make-wallpapers.py  генератор обоев и картинок экрана загрузки
+scripts/make-theme.py       сборка конфигов оформления из theme/palette.toml
 scripts/install-online.sh   установка Huilo с официального ISO Arch (без сборки образа)
+scripts/update-installed.sh обновление установленной системы (huilo-update)
+scripts/tests/              тесты (ИИ-помощник, проверщик конфига Hyprland)
+theme/                      палитра Huilo Dusk и шаблоны конфигов
+assets/huilo-photo.jpg      фото проекта (только экран загрузки)
+docs/                       схема устройства системы и руководство по изменениям
 archiso/                    профиль archiso
   profiledef.sh             параметры образа
   packages.x86_64           список пакетов (разбит по категориям)
@@ -31,16 +38,21 @@ archiso/                    профиль archiso
   pacman.conf               core + extra + multilib
   syslinux/, efiboot/       меню загрузки BIOS / UEFI
   airootfs/                 файлы, попадающие в систему
-    etc/skel/.config/       конфиги Hyprland, Waybar, Wofi, Mako, Kitty, MangoHud
+    etc/skel/.config/       конфиги Hyprland, Waybar, rofi, swaync, swayosd, Kitty, GTK/Qt, MangoHud
     etc/zapret/             конфиг zapret и пользовательские списки
     etc/systemd/system/     zapret.service, live-службы
     etc/udev/rules.d/       права на USB-устройства Arduino/ESP/STM32/Rockchip/Allwinner
-    usr/local/bin/          huilo-zapret, huilo-arduino, huilo-nanopi, huilo-install, huilo-game …
+    usr/local/bin/          huilo-zapret, huilo-menu, huilo-ai, huilo-theme, huilo-install, huilo-arduino …
+    usr/share/rofi/themes/  темы меню (генерируются из палитры)
     usr/share/huilo/atom/    Atom game pack: hostlist + ipset игр
     usr/share/huilo/embedded/ toolchain-файлы aarch64 и примеры
 vm/                         создание ВМ VirtualBox (Windows PowerShell / bash)
-.github/workflows/          сборка ISO в GitHub Actions
+.github/workflows/          проверки и сборка ISO в GitHub Actions
+CHANGELOG.md                список изменений
 ```
+
+Как всё устроено (схемы сборки и работы системы, технологии, зависимости) — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Как вносить изменения, не ломая установленные системы, и как обновлять README — [docs/MAINTAINING.md](docs/MAINTAINING.md).
 
 ## Сборка
 
@@ -100,6 +112,7 @@ python3 scripts/check-packages.py
 | `communication` | Thunderbird, Telegram, Discord, qBittorrent |
 | `media` | OBS Studio, GIMP |
 | `vscode` | VS Code (Code - OSS) |
+| `ai` | Ollama — локальная модель для ИИ-помощника (сама модель скачивается в `ии setup`), glow |
 | `games` | Atom game pack: Steam, Lutris, Wine, GameMode, MangoHud, 32-битные драйверы |
 | `arduino` | Arduino IDE 2, arduino-cli, PlatformIO, esptool, OpenOCD, PulseView … |
 | `nanopi` | кросс-компилятор aarch64, qemu-user, rkdeveloptool, xfel … |
@@ -107,7 +120,7 @@ python3 scripts/check-packages.py
 | `zapret` | обход DPI |
 | `aur` | AUR-помощник yay |
 
-Алиасы: `sysadmin`, `embedded` (= arduino + nanopi), `minimal` (= все группы, остаётся только ядро — ~160 пакетов вместо ~320).
+Алиасы: `sysadmin`, `embedded` (= arduino + nanopi), `minimal` (= все группы, остаётся только ядро — ~170 пакетов вместо ~330).
 
 ```bash
 sudo ./build.sh --without office,games,sysadmin     # ISO без офиса, игр и инструментов админа
@@ -124,17 +137,59 @@ sudo huilo-groups add office       # доставить группу
 sudo huilo-groups remove games     # удалить группу вместе с ненужными зависимостями
 ```
 
-## Оформление
+## Оформление и меню
 
-* **Обои** — фото проекта (№1, по умолчанию) и шесть оригинальных 4K-обоев, сгенерированных `scripts/make-wallpapers.py` (горы в сумерках, северное
-  сияние, поток, волны, туманность, эмблема Huilo) в палитре Catppuccin Mocha. `SUPER+W` — выбор с предпросмотром,
+Собственная тема **Huilo Dusk**: глубокие «чернильные» фоны, тёплый белый текст и янтарный акцент — одна палитра
+для всего, от меню загрузки до терминала. Цвета задаются в одном файле `theme/palette.toml`
+(как поменять — [docs/MAINTAINING.md](docs/MAINTAINING.md#3-оформление-тема)).
+
+* **Панель** — «плавающие острова» сверху: рабочие столы точками (активный — янтарная капсула), часы и дата,
+  zapret, ошибки системы, раскладка, нагрузка (раскрывается при наведении), сеть, Bluetooth, звук, батарея,
+  «не гасить экран», уведомления, питание.
+* **Меню** (rofi): `SUPER+D` — приложения рядом с превью текущих обоев, `SUPER+Space` — **меню Huilo** со всеми
+  настройками и утилитами, `SUPER+BackSpace` — питание плитками, `SUPER+W` — обои сеткой превью, `SUPER+C` — буфер
+  обмена, `SUPER+.` — эмодзи, `SUPER+=` — калькулятор, Wi-Fi — по клику на значок сети.
+* **Уведомления** (swaync): аккуратные карточки, критические — с красной полосой; `SUPER+N` — центр уведомлений
+  с переключателями Wi-Fi, Bluetooth, zapret, ночного света, эквалайзером, громкостью и плеером.
+* **Громкость и яркость** — индикатор-капсула на экране (swayosd), включая Caps Lock.
+* **Окна** — скруглённые углы, янтарная градиентная рамка у активного, тени, размытие под панелью и меню, мягкие
+  анимации. Настройки звука, Bluetooth, сети и утилиты Huilo открываются по центру плавающими окнами.
+  В виртуальной машине размытие и тени сами выключаются.
+* **Приложения** — GTK в стиле libadwaita (adw-gtk3) с янтарным акцентом, Qt через qt6ct в тех же цветах,
+  шрифт Inter, иконки Papirus, курсор Capitaine. `huilo-theme night toggle` — тёплый «ночной свет».
+* **Обои** — шесть оригинальных 4K-обоев, сгенерированных `scripts/make-wallpapers.py` в палитре Huilo (горы
+  в сумерках — по умолчанию, северное сияние, поток, волны, туманность, эмблема). `SUPER+W` — выбор,
   `SUPER+Shift+W` — следующие, `huilo-wallpaper random`. Свои картинки — в `~/Изображения/Wallpapers`.
-  Плавная смена через awww, фон экрана блокировки — текущие обои с размытием. Меню загрузки BIOS — с фоном.
-* **fastfetch** (`ff`) — собственный логотип Huilo, блоки «Система / Железо / Сеть и Huilo», статус zapret и режима
-  графики. Показывается при открытии терминала (отключить: `touch ~/.config/huilo/no-fastfetch`).
-* **Консоль** — приглашение starship (скруглённые сегменты: ОС, пользователь, каталог, git, языки, время команды),
-  kitty с темой Catppuccin, следом курсора и вкладками-«пилюлями», история на 50 000 команд, fzf (`Ctrl+R`),
-  man-страницы через bat. Текстовая консоль (tty) — в той же палитре, шрифт Terminus, приветствие Huilo.
+  Экран блокировки — текущие обои с размытием, крупные часы и дата.
+* **Терминал** — kitty в цветах Huilo, приглашение starship, fastfetch (`ff`) с логотипом Huilo при открытии
+  (отключить: `touch ~/.config/huilo/no-fastfetch`), история на 50 000 команд, fzf (`Ctrl+R`). Текстовые меню
+  скриптов (zapret, установщик) и текстовая консоль tty — в той же палитре. Свои настройки kitty — `~/.config/kitty/user.conf`.
+
+## ИИ-помощник
+
+Для тех, кто впервые видит Linux. Спросите обычными словами — помощник ответит по-русски, коротко, и предложит
+готовые команды. **Ничего не выполняется без вашего «да»**; опасные команды (удаление, форматирование, запуск
+скриптов из интернета) помечены красным, и для них нужно напечатать слово «выполнить».
+
+```bash
+ии                          # разговор: спрашивайте, выполняйте предложенное, просите объяснить результат
+ии как установить телеграм  # один вопрос
+ии почему нет звука
+sudo pacman -Syu 2>&1 | ии  # объяснить вывод команды или ошибку
+ии объясни                  # что делала предыдущая команда
+ии setup                    # выбрать «мозг»
+```
+
+Также: `SUPER+I`, пункт «ИИ-помощник» в меню Huilo (`SUPER+Space`) и в приложениях. Если набрать несуществующую
+команду, терминал подскажет спросить помощника.
+
+| «Мозг» | Плюсы | Что нужно |
+|---|---|---|
+| **Локальный** (Ollama, модель Qwen 3) | бесплатно, приватно, работает без интернета | группа `ai` (есть в образе), один раз скачать модель 1–5 ГБ (`ии setup` выберет размер по памяти) |
+| **Claude** (Anthropic) | умнее и быстрее на слабом ПК | интернет и API-ключ с console.anthropic.com; вопросы уходят в Anthropic; доступен не во всех странах |
+
+Настройки — `~/.config/huilo/ai.conf` (`BACKEND=local|claude|auto`, `LOCAL_MODEL=…`, `CLAUDE_MODEL=…`), ключ —
+`~/.config/huilo/ai.key` (виден только вам). Без группы `ai`: `./build.sh --without ai`.
 
 ## Журналы и уведомления об ошибках
 
@@ -163,15 +218,17 @@ huilo-eq off / on        # выключить / включить эффекты
 ## Экран загрузки
 
 После BIOS/UEFI показывается фото проекта (`assets/huilo-photo.jpg`): в меню загрузки BIOS (syslinux) и на экране
-загрузки системы (Plymouth, тема `huilo`, с полосой прогресса и вводом пароля для зашифрованных дисков). Это же фото —
-обои №1 и по умолчанию. Картинки пересобираются `python3 scripts/make-wallpapers.py`.
+загрузки системы (Plymouth, тема `huilo`, с янтарной полосой прогресса и вводом пароля для зашифрованных дисков).
+Фото используется **только на экране загрузки** — в обоях его нет. Картинки пересобираются
+`python3 scripts/make-wallpapers.py`.
 
 ## Live-режим
 
 * Автовход: пользователь **`huilo`**, пароль **`huilo`** (sudo без пароля), графический сеанс стартует сам.
 * Пункт меню *safe graphics: sway without 3D* — упрощённый рабочий стол без 3D-ускорения,
   *console only* — загрузка без графики (`huilo.nogui`).
-* `SUPER+F1` — шпаргалка по горячим клавишам, `SUPER+Z` — меню zapret, `SUPER+D` — приложения.
+* `SUPER+Space` — меню Huilo, `SUPER+D` — приложения, `SUPER+I` — ИИ-помощник, `SUPER+Z` — меню zapret,
+  `SUPER+F1` — шпаргалка по всем горячим клавишам.
 
 ## Графический сеанс и безопасный режим
 
@@ -202,7 +259,14 @@ Hyprland официально не поддерживает виртуальны
 
 ## Обновление уже установленной системы
 
-Без переустановки — новые скрипты, конфиги (старые сохраняются как `*.bak-<дата>`), безопасный режим, пункт загрузки:
+Без переустановки — новые скрипты, тема, конфиги (изменённые вами файлы сохраняются как `*.bak-<дата>`, личные
+`~/.config/hypr/user.lua` и `~/.config/kitty/user.conf` не трогаются), безопасный режим, пункт загрузки:
+
+```bash
+huilo-update            # на системе, где Huilo уже есть
+```
+
+или, если команды `huilo-update` ещё нет (старая установка, ASOS):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash
@@ -354,4 +418,13 @@ sudo huilo-install
 * В виртуальной машине Hyprland требует 3D-ускорения (см. «Графический сеанс и безопасный режим»).
 * AUR-пакеты собираются из PKGBUILD на момент сборки образа; если какой-то не соберётся, ISO всё равно
   будет создан, а пакет можно поставить позже: `yay -S <пакет>`.
+* Старые имена команд (`asos-*`, `huilo-power`) пока работают и подсказывают новое имя: `huilo-legacy --list`.
 * Лицензии: zapret — MIT (bol-van), стратегии и списки — MIT (Flowseal).
+
+## Для разработчиков
+
+* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — что на чём построено: схемы сборки, загрузки и рабочего стола,
+  технологии (archiso, Docker, systemd, Wayland, PipeWire, nftables …), зависимости скриптов, карта репозитория.
+* [docs/MAINTAINING.md](docs/MAINTAINING.md) — как менять конфигурацию: где какой файл, тема и палитра, пакеты,
+  новые команды, обновление установленных систем, правила legacy, как обновлять README и CHANGELOG, проверки.
+* [CHANGELOG.md](CHANGELOG.md) — список изменений.

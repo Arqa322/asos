@@ -1,3 +1,4 @@
+# generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy)
 # ============================================================
 #  Huilo safe graphics mode: sway with the pixman (CPU) renderer
 #  Used automatically by huilo-session when Hyprland cannot start
@@ -5,11 +6,19 @@
 # ============================================================
 set $mod Mod4
 set $term foot
-set $menu wofi --show drun
+set $menu huilo-menu apps
 
 default_border pixel 2
 gaps inner 4
-client.focused #89b4fa #89b4fa #1e1e2e #cba6f7 #89b4fa
+gaps outer 6
+smart_borders off
+font pango:Inter 10
+#                       border     background text       indicator  child_border
+client.focused          #f2a33a    #f2a33a    @{ink0}    #ff6b4a    #f2a33a
+client.focused_inactive @{ink4}    @{ink2}    #b9bfcc     @{ink4}    @{ink4}
+client.unfocused        @{ink4}    @{ink1}    #8a91a5    @{ink4}    @{ink4}
+client.urgent           #f0566a    #f0566a    @{ink0}    #f0566a    #f0566a
+client.background       @{ink0}
 
 input type:keyboard {
     xkb_layout us,ru
@@ -33,7 +42,12 @@ bindsym $mod+F1 exec foot -T huilo-help less /usr/share/huilo/HOTKEYS.txt
 bindsym $mod+Shift+a exec foot -T huilo-arduino huilo-arduino menu
 bindsym $mod+Shift+n exec foot -T huilo-nanopi huilo-nanopi menu
 bindsym $mod+Escape exec foot -T btop btop
-bindsym $mod+BackSpace exec huilo-power
+bindsym $mod+BackSpace exec huilo-menu power
+bindsym $mod+c exec huilo-menu clipboard
+bindsym $mod+period exec huilo-menu emoji
+bindsym $mod+n exec swaync-client -t -sw
+bindsym $mod+space exec huilo-menu hub
+bindsym $mod+i exec foot -T huilo-ai huilo-ai
 bindsym $mod+Shift+e exit
 bindsym $mod+Shift+s exec grim -g "$(slurp)" - | swappy -f -
 bindsym Print exec grim - | wl-copy
@@ -66,9 +80,11 @@ bindsym $mod+Shift+8 move container to workspace number 8
 bindsym $mod+Shift+9 move container to workspace number 9
 bindsym $mod+Shift+0 move container to workspace number 10
 floating_modifier $mod normal
-bindsym --locked XF86AudioRaiseVolume exec wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+
-bindsym --locked XF86AudioLowerVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
-bindsym --locked XF86AudioMute exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+bindsym --locked XF86AudioRaiseVolume exec swayosd-client --output-volume raise || wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+
+bindsym --locked XF86AudioLowerVolume exec swayosd-client --output-volume lower || wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+bindsym --locked XF86AudioMute exec swayosd-client --output-volume mute-toggle || wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+bindsym --locked XF86MonBrightnessUp exec swayosd-client --brightness raise || brightnessctl s 10%+
+bindsym --locked XF86MonBrightnessDown exec swayosd-client --brightness lower || brightnessctl s 10%-
 
 exec huilo-wallpaper
 exec huilo-logwatch run
@@ -77,7 +93,9 @@ bindsym $mod+Shift+m exec huilo-eq menu
 bindsym $mod+w exec huilo-wallpaper pick
 bindsym $mod+Shift+w exec huilo-wallpaper next
 exec waybar -c /usr/share/huilo/sway/waybar.jsonc -s ~/.config/waybar/style.css
-exec mako
+exec huilo-theme apply
+exec env GSK_RENDERER=cairo swaync
+exec swayosd-server
 exec systemctl --user start hyprpolkitagent
 exec nm-applet --indicator
 exec blueman-applet
@@ -85,4 +103,9 @@ exec wl-paste --type text --watch cliphist store
 exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
 exec notify-send -a Huilo -t 20000 "Безопасный графический режим" "Hyprland не запустился на этой видеокарте (часто — нет 3D-ускорения в ВМ). Работает упрощённый рабочий стол sway. Подробности: huilo-doctor"
 
+
+for_window [title="^huilo-"] floating enable, resize set 960 620
+for_window [app_id="pavucontrol|blueman-manager|nm-connection-editor|org.pulseaudio.pavucontrol"] floating enable
+
+# your own settings
 include ~/.config/huilo/sway.conf
