@@ -3,8 +3,8 @@
    Colours: theme/palette.toml */
 window#osd {
   border-radius: 999px;
-  border: 1px solid rgba(@{ink4.rgb}, 1);
-  background: rgba(@{ink1.rgb}, 0.92);
+  border: 1px solid rgba(46, 52, 69, 1);
+  background: rgba(17, 20, 27, 0.92);
 }
 window#osd #container { margin: 14px 20px; }
 window#osd image, window#osd label { color: #ece7dc; }

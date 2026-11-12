@@ -3,9 +3,9 @@
 return {
     accent      = "rgba(f2a33aff)",
     accent2     = "rgba(ff6b4aff)",
-    inactive    = "rgba(@{ink4.hex}aa)",
+    inactive    = "rgba(2e3445aa)",
     locked      = "rgba(6f8fc7ff)",
     group       = "rgba(b08ad8ff)",
-    shadow      = "rgba(@{ink0.hex}cc)",
-    background  = "rgba(@{ink0.hex}ff)",
+    shadow      = "rgba(0b0d12cc)",
+    background  = "rgba(0b0d12ff)",
 }

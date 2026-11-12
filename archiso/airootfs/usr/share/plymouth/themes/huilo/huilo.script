@@ -4,8 +4,8 @@
 // splash.png:     the photo, shown whole, as large as fits
 // bar.png:        1x1 accent colour for the progress bar (scripts/make-theme.py)
 
-Window.SetBackgroundTopColor(@{ink0.float});
-Window.SetBackgroundBottomColor(@{ink1.float});
+Window.SetBackgroundTopColor(0.043, 0.051, 0.071);
+Window.SetBackgroundBottomColor(0.067, 0.078, 0.106);
 
 sw = Window.GetWidth();
 sh = Window.GetHeight();

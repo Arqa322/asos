@@ -2,11 +2,11 @@
 /* Huilo launcher theme for rofi. Colours: theme/palette.toml
    Variants: huilo-list (menus), huilo-power, huilo-grid (wallpapers) */
 * {
-    ink0: @{ink0};  ink1: @{ink1};  ink2: @{ink2};  ink3: @{ink3};  ink4: @{ink4};
+    ink0: #0b0d12;  ink1: #11141b;  ink2: #181c25;  ink3: #222734;  ink4: #2e3445;
     mist: #8a91a5;  fog: #b9bfcc;    snow: #ece7dc;
     amber: #f2a33a; honey: #ffc978; ember: #ff6b4a; berry: #f0566a; pine: #8bc78f;
-    panel: rgba(@{ink1.rgb}, 0.94);
-    glass: rgba(@{ink0.rgb}, 0.55);
+    panel: rgba(17, 20, 27, 0.94);
+    glass: rgba(11, 13, 18, 0.55);
     pick:  rgba(242, 163, 58, 0.16);
 
     font: "Inter 11";

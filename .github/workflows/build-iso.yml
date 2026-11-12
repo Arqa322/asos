@@ -39,7 +39,7 @@ jobs:
       - name: Theme files are generated from theme/palette.toml
         run: |
           python3 scripts/make-theme.py --check
-          if grep -rIl --exclude-dir=Arduino '@{[a-z_]*\(\.[a-z]*\)\?}' archiso/; then echo "::error::unrendered theme placeholders"; exit 1; fi
+          if grep -rIl --exclude-dir=Arduino '@{[a-z][a-z0-9_]*\(\.[a-z]*\)\?}' archiso/; then echo "::error::unrendered theme placeholders"; exit 1; fi
       - name: AI assistant (huilo-ai) against a mock model server
         run: scripts/tests/test-huilo-ai.sh
       - name: Optional package groups

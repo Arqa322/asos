@@ -83,7 +83,6 @@ hl.config({
         col = {
             active_border   = { colors = { theme.accent, theme.accent2 }, angle = 45 },
             inactive_border = theme.inactive,
-            nogroup_border_active = theme.locked,
         },
         resize_on_border = true,
         allow_tearing    = true,

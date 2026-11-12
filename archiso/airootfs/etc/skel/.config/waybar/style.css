@@ -15,7 +15,7 @@ window#waybar {
 }
 
 tooltip {
-    background: rgba(@{ink1.rgb}, 0.96);
+    background: rgba(17, 20, 27, 0.96);
     border: 1px solid rgba(242, 163, 58, 0.35);
     border-radius: 12px;
 }
@@ -23,8 +23,8 @@ tooltip label { color: #ece7dc; padding: 4px 6px; }
 
 /* islands */
 .modules-left, .modules-center, .modules-right {
-    background: rgba(@{ink1.rgb}, 0.78);
-    border: 1px solid rgba(@{ink4.rgb}, 0.9);
+    background: rgba(17, 20, 27, 0.78);
+    border: 1px solid rgba(46, 52, 69, 0.9);
     border-radius: 16px;
     padding: 0 6px;
 }
@@ -32,7 +32,7 @@ tooltip label { color: #ece7dc; padding: 4px 6px; }
 .modules-right { margin-right: 2px; }
 
 #custom-launcher {
-    color: @{ink0};
+    color: #0b0d12;
     background: linear-gradient(135deg, #f2a33a, #ff6b4a);
     border-radius: 11px;
     margin: 4px 4px 4px 0;
@@ -45,7 +45,7 @@ tooltip label { color: #ece7dc; padding: 4px 6px; }
 #workspaces { margin: 0 4px; }
 #workspaces button {
     color: #8a91a5;
-    background: rgba(@{ink4.rgb}, 0.7);
+    background: rgba(46, 52, 69, 0.7);
     margin: 9px 3px;
     padding: 0;
     min-width: 12px;
@@ -53,7 +53,7 @@ tooltip label { color: #ece7dc; padding: 4px 6px; }
     font-size: 0;
     transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
-#workspaces button.empty   { background: rgba(@{ink4.rgb}, 0.45); }
+#workspaces button.empty   { background: rgba(46, 52, 69, 0.45); }
 #workspaces button:hover   { background: #b9bfcc; }
 #workspaces button.active  { min-width: 30px; background: linear-gradient(90deg, #f2a33a, #ff6b4a); }
 #workspaces button.urgent  { background: #f0566a; }
@@ -81,7 +81,7 @@ window#waybar.empty #window { padding: 0; }
 #custom-health:hover, #custom-zapret:hover, #custom-notifications:hover, #language:hover,
 #pulseaudio:hover, #network:hover, #bluetooth:hover, #cpu:hover, #memory:hover,
 #battery:hover, #custom-power:hover, #idle_inhibitor:hover {
-    background: rgba(@{ink3.rgb}, 0.95);
+    background: rgba(34, 39, 52, 0.95);
     color: #ece7dc;
 }
 
@@ -97,7 +97,7 @@ window#waybar.empty #window { padding: 0; }
 
 #custom-health        { padding: 0 0; margin: 5px 0; }
 #custom-health.ok     { color: #8bc78f; padding: 0 7px; }
-#custom-health.error  { color: @{ink0}; background: #ffc978; padding: 0 9px; }
+#custom-health.error  { color: #0b0d12; background: #ffc978; padding: 0 9px; }
 #custom-health.critical { color: #ece7dc; background: #f0566a; padding: 0 9px; }
 
 #custom-notifications.notification, #custom-notifications.dnd-notification { color: #f2a33a; }
@@ -110,10 +110,10 @@ window#waybar.empty #window { padding: 0; }
 
 #tray > .passive        { -gtk-icon-effect: dim; }
 #tray > .needs-attention { background: rgba(240, 86, 106, 0.25); border-radius: 8px; }
-#tray menu { background: @{ink1}; color: #ece7dc; border-radius: 10px; }
+#tray menu { background: #11141b; color: #ece7dc; border-radius: 10px; }
 
 #custom-power { color: #ff6b4a; margin-right: 0; padding: 0 11px 0 9px; }
 
 /* safe graphics mode (sway): a visible reminder */
-#custom-safe { color: @{ink0}; background: #ffc978; padding: 0 10px; margin: 5px 2px; border-radius: 10px; font-weight: 700; }
-#mode { color: @{ink0}; background: #f2a33a; padding: 0 10px; margin: 5px 2px; border-radius: 10px; }
+#custom-safe { color: #0b0d12; background: #ffc978; padding: 0 10px; margin: 5px 2px; border-radius: 10px; font-weight: 700; }
+#mode { color: #0b0d12; background: #f2a33a; padding: 0 10px; margin: 5px 2px; border-radius: 10px; }

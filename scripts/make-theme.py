@@ -56,7 +56,11 @@ def render(text, colors, fonts, where):
         return {"": c, "hex": c[1:], "rgb": f"{r}, {g}, {b}", "argb": "#ff" + c[1:],
                 "float": f"{r / 255:.3f}, {g / 255:.3f}, {b / 255:.3f}"}.get(fmt) \
             or sys.exit(f"{where}: unknown format @{{{m.group(1)}}}")
-    return re.sub(r"@\{([a-z_]+(?:\.[a-z]+)?)\}", sub, text)
+    out = re.sub(r"@\{([a-z][a-z0-9_]*(?:\.[a-z]+)?)\}", sub, text)
+    left = re.search(r"@\{[^}\s]*\}", out)
+    if left:
+        sys.exit(f"{where}: placeholder {left.group(0)} was not replaced (bad name?)")
+    return out
 
 
 def header(path):

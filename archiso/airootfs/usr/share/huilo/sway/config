@@ -14,11 +14,11 @@ gaps outer 6
 smart_borders off
 font pango:Inter 10
 #                       border     background text       indicator  child_border
-client.focused          #f2a33a    #f2a33a    @{ink0}    #ff6b4a    #f2a33a
-client.focused_inactive @{ink4}    @{ink2}    #b9bfcc     @{ink4}    @{ink4}
-client.unfocused        @{ink4}    @{ink1}    #8a91a5    @{ink4}    @{ink4}
-client.urgent           #f0566a    #f0566a    @{ink0}    #f0566a    #f0566a
-client.background       @{ink0}
+client.focused          #f2a33a    #f2a33a    #0b0d12    #ff6b4a    #f2a33a
+client.focused_inactive #2e3445    #181c25    #b9bfcc     #2e3445    #2e3445
+client.unfocused        #2e3445    #11141b    #8a91a5    #2e3445    #2e3445
+client.urgent           #f0566a    #f0566a    #0b0d12    #f0566a    #f0566a
+client.background       #0b0d12
 
 input type:keyboard {
     xkb_layout us,ru

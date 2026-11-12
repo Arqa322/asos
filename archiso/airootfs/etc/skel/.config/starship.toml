@@ -28,11 +28,11 @@ add_newline = true
 palette = "huilo"
 
 [palettes.huilo]
-ink0 = "@{ink0}"
-ink1 = "@{ink1}"
-ink2 = "@{ink2}"
-ink3 = "@{ink3}"
-ink4 = "@{ink4}"
+ink0 = "#0b0d12"
+ink1 = "#11141b"
+ink2 = "#181c25"
+ink3 = "#222734"
+ink4 = "#2e3445"
 mist = "#8a91a5"
 fog = "#b9bfcc"
 snow = "#ece7dc"
