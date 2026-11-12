@@ -96,7 +96,11 @@ for d in "$WORK_DIR" "$OUT_DIR" "$CACHE_DIR"; do
 done
 
 echo ":: Проверка ключей pacman"
-[[ -s /etc/pacman.d/gnupg/pubring.gpg || -s /etc/pacman.d/gnupg/pubring.kbx ]] || pacman-key --init
+# --populate signs the Arch keys with the local master key: a keyring without a
+# secret key (fresh containers ship one) must be initialised first
+if ! gpg --homedir /etc/pacman.d/gnupg --list-secret-keys 2>/dev/null | grep -q '^sec'; then
+	pacman-key --init
+fi
 pacman-key --populate archlinux >/dev/null
 pacman -Sy --noconfirm --needed archlinux-keyring
 
