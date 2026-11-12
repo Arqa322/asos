@@ -58,7 +58,32 @@ TZ_=$(ask --inputbox "Часовой пояс (например Europe/Moscow, A
 AUTOLOGIN=no
 ask --yesno "Автоматически входить в систему и запускать Hyprland\nбез ввода пароля (как в live-режиме)?" 8 60 && AUTOLOGIN=yes
 
-CONFIRM=$(ask --inputbox "ВНИМАНИЕ! Диск $DISK будет полностью стёрт.\nРежим загрузки: $([[ $UEFI == 1 ]] && echo UEFI || echo BIOS), ФС: $FS\n\nВведите YES для продолжения:" 12 60) || exit 0
+# optional software groups: everything present on the live medium is ticked;
+# unticked groups are removed from the installed system after copying
+REMOVE_GROUPS=""
+SEL=/usr/share/asos/pkg-select.sh
+if [[ -x "$SEL" && -r /usr/share/asos/packages.x86_64 ]]; then
+	items=()
+	while read -r g desc; do
+		case "$g" in
+			zapret) state=$(systemctl is-enabled --quiet zapret.service 2>/dev/null && echo on || echo off) ;;
+			aur) state=$(pacman -Qq yay-bin >/dev/null 2>&1 && echo on || echo off) ;;
+			*) # a group counts as present when at least one of its packages is installed
+			   state=off
+			   if comm -12 <("$SEL" /usr/share/asos/packages.x86_64 --only "$g" | sort) <(pacman -Qq | sort) | grep -q .; then state=on; fi ;;
+		esac
+		[[ $state == on ]] && items+=("$g" "$desc" on)
+	done < <("$SEL" --list-groups | grep -v 'алиасы' | sed 's/^ *//')
+	if [[ ${#items[@]} -gt 0 ]]; then
+		keep=$(ask --separate-output --checklist "Программы для установки (снимите лишнее пробелом):" 22 90 14 "${items[@]}") || exit 0
+		for ((i = 0; i < ${#items[@]}; i += 3)); do
+			grep -qx "${items[i]}" <<<"$keep" || REMOVE_GROUPS+="${items[i]},"
+		done
+		REMOVE_GROUPS=${REMOVE_GROUPS%,}
+	fi
+fi
+
+CONFIRM=$(ask --inputbox "ВНИМАНИЕ! Диск $DISK будет полностью стёрт.\nРежим загрузки: $([[ $UEFI == 1 ]] && echo UEFI || echo BIOS), ФС: $FS\nНе устанавливать: ${REMOVE_GROUPS:-—}\n\nВведите YES для продолжения:" 13 70) || exit 0
 [[ "$CONFIRM" == "YES" ]] || die "установка отменена"
 clear
 
@@ -215,6 +240,10 @@ systemctl enable NetworkManager.service bluetooth.service zapret.service power-p
 EOF
 chmod +x "$MNT/root/asos-chroot.sh"
 arch-chroot "$MNT" /root/asos-chroot.sh
+if [[ -n "$REMOVE_GROUPS" ]]; then
+	echo ":: Удаление групп: $REMOVE_GROUPS"
+	arch-chroot "$MNT" asos-groups remove "$REMOVE_GROUPS" || echo "!! часть пакетов не удалилась (см. выше)"
+fi
 echo "$USERNAME_:$PASS1" | arch-chroot "$MNT" chpasswd
 rm -f "$MNT/root/asos-chroot.sh"
 sync

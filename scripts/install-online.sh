@@ -15,9 +15,29 @@
 #    ASOS_DISK=/dev/sda ASOS_USER=user ASOS_PASSWORD=secret ASOS_HOSTNAME=asos \
 #    ASOS_TZ=Europe/Moscow ASOS_FS=btrfs ASOS_AUTOLOGIN=yes ASOS_YES=1 bash i.sh
 #
-#  Skip parts:  ASOS_SKIP_AUR=1  ASOS_SKIP_ARDUINO=1  ASOS_SKIP_GROUPS="Atom game pack;Office ..."
+#  Leave optional software out:
+#    bash i.sh --without office,games,sysadmin     (or ASOS_WITHOUT="office games")
+#    bash i.sh --minimal                           core system only
+#    bash i.sh --list-groups                       show the groups
+#  Without these the installer asks which groups to skip.
+#  Also: ASOS_SKIP_AUR=1  ASOS_SKIP_ARDUINO=1
 # ============================================================================
 set -euo pipefail
+
+WITHOUT="${ASOS_WITHOUT:-}"; WITHOUT_GIVEN=0; LIST_GROUPS=0
+[[ -n "$WITHOUT" ]] && WITHOUT_GIVEN=1
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--without) WITHOUT+=" ${2:?--without needs a list of groups}"; WITHOUT_GIVEN=1; shift ;;
+		--without=*) WITHOUT+=" ${1#*=}"; WITHOUT_GIVEN=1 ;;
+		--minimal) WITHOUT+=" minimal"; WITHOUT_GIVEN=1 ;;
+		--all) WITHOUT_GIVEN=1 ;;
+		--list-groups) LIST_GROUPS=1 ;;
+		-h|--help) sed -n '2,26p' "$0"; exit 0 ;;
+		*) echo "unknown option: $1" >&2; exit 1 ;;
+	esac
+	shift
+done
 
 REPO="${ASOS_REPO:-Arqa322/asos}"
 REF="${ASOS_REF:-claude/arch-hyprland-custom-image-hl6sdl}"
@@ -87,6 +107,8 @@ else
 	[[ -f "$SRC/archiso/packages.x86_64" ]] || die "не удалось скачать репозиторий ASOS"
 fi
 PROFILE="$SRC/archiso"
+SEL="$SRC/scripts/pkg-select.sh"
+if [[ $LIST_GROUPS == 1 ]]; then "$SEL" --list-groups; exit 0; fi
 
 # ------------------------------------------------------------- questions ---
 ask() { # ask VAR "question" "default"
@@ -129,9 +151,21 @@ ASOS_TZ=${ASOS_TZ:-}; ask ASOS_TZ "Часовой пояс" "Europe/Moscow"
 DEFAULT_AUTOLOGIN=no; [[ "$VIRT" != none ]] && DEFAULT_AUTOLOGIN=yes
 ASOS_AUTOLOGIN=${ASOS_AUTOLOGIN:-}; ask ASOS_AUTOLOGIN "Автовход и запуск Hyprland без пароля (yes/no)" "$DEFAULT_AUTOLOGIN"
 
+# optional software groups
+if [[ $WITHOUT_GIVEN == 0 ]]; then
+	echo
+	echo "Необязательные группы программ:"
+	"$SEL" --list-groups
+	read -rp "Какие НЕ устанавливать (через запятую; Enter — установить всё; minimal — только основа): " WITHOUT </dev/tty
+fi
+EXCLUDED=$("$SEL" --resolve "$WITHOUT") || die "неизвестная группа в списке: $WITHOUT"
+excluded() { grep -qx "$1" <<<"$EXCLUDED"; }
+EXCLUDED_TXT=$(tr '\n' ' ' <<<"$EXCLUDED" | xargs)
+
 echo
 echo "  диск:        ${c_b}$ASOS_DISK${c_0} (${DISK_GB} ГБ), ФС: $ASOS_FS, загрузка: $([[ $UEFI == 1 ]] && echo UEFI/systemd-boot || echo BIOS/GRUB)"
 echo "  компьютер:   $ASOS_HOSTNAME, пользователь: $ASOS_USER, часовой пояс: $ASOS_TZ, автовход: $ASOS_AUTOLOGIN"
+echo "  без групп:   ${EXCLUDED_TXT:-нет (устанавливается всё)}"
 if [[ "${ASOS_YES:-0}" != 1 ]]; then
 	read -rp "${c_err}Диск $ASOS_DISK будет полностью стёрт.${c_0} Введите YES: " ok </dev/tty
 	[[ "$ok" == YES ]] || die "отменено"
@@ -181,14 +215,16 @@ mount "$BOOTP" "$MNT/boot"
 # so even a 20 GB disk is enough.
 declare -a SECTION_NAMES=()
 declare -A SECTION_PKGS=()
-current="Base"
+current="Base"; cur_skip=0
 while IFS= read -r line; do
-	if [[ "$line" =~ ^#\ -+\ (.+)\ -+$ ]]; then
-		current=${BASH_REMATCH[1]}
+	if [[ "$line" =~ ^#\ -+\ (\[([a-z0-9-]+)\]\ )?(.+)\ -+$ ]]; then
+		current=${BASH_REMATCH[3]}
+		cur_skip=0
+		if [[ -n "${BASH_REMATCH[2]}" ]] && excluded "${BASH_REMATCH[2]}"; then cur_skip=1; fi
 		continue
 	fi
 	line=${line%%#*}; line=${line//[[:space:]]/}
-	[[ -n "$line" ]] || continue
+	[[ -n "$line" && $cur_skip == 0 ]] || continue
 	skip=0; for l in "${LIVE_ONLY[@]}"; do [[ "$line" == "$l" ]] && skip=1; done
 	[[ $skip == 0 ]] || continue
 	if [[ -z "${SECTION_PKGS[$current]+x}" ]]; then SECTION_NAMES+=("$current"); SECTION_PKGS[$current]=""; fi
@@ -214,9 +250,7 @@ pacstrap -K -C "$PACMAN_CONF" "$MNT" ${SECTION_PKGS[$first]} || die "pacstrap н
 install -m 0644 "$PACMAN_CONF" "$MNT/etc/pacman.conf"
 clean_cache
 
-skip_groups=";${ASOS_SKIP_GROUPS:-};"
 for sec in "${SECTION_NAMES[@]:1}"; do
-	if [[ "$skip_groups" == *";$sec;"* ]]; then info "пропуск: $sec"; continue; fi
 	step "Установка: $sec  (свободно $(space))"
 	# shellcheck disable=SC2206
 	pkgs=(${SECTION_PKGS[$sec]})
@@ -260,7 +294,8 @@ CMDLINE="root=UUID=$ROOT_UUID rw $ROOTFLAGS quiet splash loglevel=3"
 
 # ------------------------------------------------------------ system setup ---
 step "Системные настройки, пользователь, загрузчик"
-SERVICES="NetworkManager.service bluetooth.service zapret.service power-profiles-daemon.service systemd-timesyncd.service avahi-daemon.service fstrim.timer"
+ZAPRET_SVC="zapret.service"; excluded zapret && ZAPRET_SVC=""
+SERVICES="NetworkManager.service bluetooth.service $ZAPRET_SVC power-profiles-daemon.service systemd-timesyncd.service avahi-daemon.service fstrim.timer"
 case "$VIRT" in
 	oracle) SERVICES+=" vboxservice.service" ;;
 	kvm|qemu) SERVICES+=" qemu-guest-agent.service" ;;
@@ -296,19 +331,30 @@ printf '%s:%s\n' "$ASOS_USER" "$ASOS_PASSWORD" | arch-chroot "$MNT" chpasswd
 rm -f "$MNT/root/asos-setup.sh"
 
 # -------------------------------------------------- zapret + Flowseal ---
-step "zapret + стратегии Flowseal"
 mkdir -p "$MNT/root/asos-src"
 cp -a "$SRC/scripts" "$SRC/archiso" "$MNT/root/asos-src/"
-arch-chroot "$MNT" env DEST=/opt/zapret bash /root/asos-src/scripts/fetch-zapret.sh ||
-	warn "zapret не скачан — позже: sudo DEST=/opt/zapret bash fetch-zapret.sh"
+# group tools for later changes: asos-groups add/remove/list
+install -Dm0644 "$SRC/archiso/packages.x86_64" "$MNT/usr/share/asos/packages.x86_64"
+install -Dm0755 "$SRC/scripts/pkg-select.sh" "$MNT/usr/share/asos/pkg-select.sh"
+install -Dm0755 "$SRC/scripts/fetch-zapret.sh" "$MNT/usr/share/asos/fetch-zapret.sh"
+printf 'INSTALLED=%s\nEXCLUDED_GROUPS="%s"\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "$EXCLUDED_TXT" >"$MNT/usr/share/asos/build-info"
+if excluded zapret; then
+	rm -f "$MNT/etc/systemd/system/multi-user.target.wants/zapret.service"
+	info "zapret не устанавливается (включить позже: sudo asos-groups add zapret)"
+else
+	step "zapret + стратегии Flowseal"
+	arch-chroot "$MNT" env DEST=/opt/zapret bash /root/asos-src/scripts/fetch-zapret.sh ||
+		warn "zapret не скачан — позже: sudo asos-groups add zapret"
+fi
 
 # -------------------------------------------------------------- AUR ---
-if [[ "${ASOS_SKIP_AUR:-0}" != 1 ]]; then
-	step "AUR: Arduino IDE 2, rkdeveloptool, xfel, tio, cutecom, mpremote, yay"
+"$SEL" "$SRC/archiso/packages.aur" --without "$EXCLUDED" >"$MNT/root/asos-src/aur.list"
+if [[ "${ASOS_SKIP_AUR:-0}" != 1 && -s "$MNT/root/asos-src/aur.list" ]]; then
+	step "AUR: $(tr '\n' ' ' <"$MNT/root/asos-src/aur.list")"
 	echo "$ASOS_USER ALL=(ALL) NOPASSWD: /usr/bin/pacman" >"$MNT/etc/sudoers.d/99-asos-install"
 	chmod 0440 "$MNT/etc/sudoers.d/99-asos-install"
 	arch-chroot "$MNT" env SUDO_USER="$ASOS_USER" bash /root/asos-src/scripts/build-aur.sh \
-		/root/asos-src/archiso/packages.aur /var/cache/asos-aur || true
+		/root/asos-src/aur.list /var/cache/asos-aur || true
 	shopt -s nullglob
 	aurpkgs=("$MNT"/var/cache/asos-aur/*.pkg.tar.*)
 	shopt -u nullglob
@@ -321,7 +367,7 @@ if [[ "${ASOS_SKIP_AUR:-0}" != 1 ]]; then
 fi
 
 # ------------------------------------------------------------- Arduino ---
-if [[ "${ASOS_SKIP_ARDUINO:-0}" != 1 ]]; then
+if [[ "${ASOS_SKIP_ARDUINO:-0}" != 1 ]] && ! excluded arduino; then
 	step "Arduino: ядро AVR и библиотеки для $ASOS_USER"
 	arch-chroot "$MNT" sudo -u "$ASOS_USER" -H bash /root/asos-src/scripts/fetch-arduino.sh "/home/$ASOS_USER" ||
 		warn "Arduino не настроен — позже: asos-arduino setup avr"

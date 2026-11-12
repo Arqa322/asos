@@ -2,8 +2,14 @@
 # ============================================================================
 #  Build the ASOS ISO.
 #
-#  On Arch Linux (needs archiso):     sudo ./build.sh
-#  Anywhere with Docker/Podman:       ./build.sh --docker
+#  On Arch Linux (needs archiso):     sudo ./build.sh [options]
+#  Anywhere with Docker/Podman:       ./build.sh --docker [options]
+#
+#  Options:
+#    --without GROUPS   leave optional groups out (comma separated), e.g.
+#                       --without office,games,sysadmin
+#    --minimal          core system only (Hyprland desktop, browser, CLI)
+#    --list-groups      show the optional groups
 #
 #  Steps: copy the archiso profile to WORK_DIR -> fetch zapret + Flowseal ->
 #  build AUR packages into a local repo -> pre-install Arduino cores/libraries
@@ -14,6 +20,7 @@
 #    FLOWSEAL_REF     Flowseal branch or tag        (default: main)
 #    ARDUINO_CORES    cores to pre-install          (default: arduino:avr)
 #    ARDUINO_LIBS     ';' separated libraries       (default: see fetch-arduino.sh)
+#    ASOS_WITHOUT     same as --without
 #    SKIP_AUR=1       do not build AUR packages
 #    SKIP_ARDUINO=1   do not pre-install Arduino cores/libraries
 #    OUT_DIR          default ./out
@@ -24,11 +31,29 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/out}"
 WORK_DIR="${WORK_DIR:-$ROOT/work}"
 
-if [[ "${1:-}" == "--docker" ]]; then
+WITHOUT="${ASOS_WITHOUT:-}"
+DOCKER=0
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--docker) DOCKER=1 ;;
+		--without) WITHOUT+=" ${2:?--without needs a list of groups}"; shift ;;
+		--without=*) WITHOUT+=" ${1#*=}" ;;
+		--minimal) WITHOUT+=" minimal" ;;
+		--list-groups) echo "Необязательные группы (./build.sh --without группа1,группа2):"; "$ROOT/scripts/pkg-select.sh" --list-groups; exit 0 ;;
+		-h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+		*) echo "unknown option: $1 (see ./build.sh --help)" >&2; exit 1 ;;
+	esac
+	shift
+done
+EXCLUDED=$("$ROOT/scripts/pkg-select.sh" --resolve "$WITHOUT") || exit 2
+excluded() { grep -qx "$1" <<<"$EXCLUDED"; }
+[[ -z "$EXCLUDED" ]] || echo ":: без групп: $(tr '\n' ' ' <<<"$EXCLUDED")"
+
+if [[ $DOCKER == 1 ]]; then
 	engine=$(command -v docker || command -v podman) || { echo "docker/podman not found" >&2; exit 1; }
 	exec "$engine" run --rm --privileged \
 		-e ZAPRET_VERSION -e FLOWSEAL_REF -e ARDUINO_CORES -e ARDUINO_LIBS \
-		-e SKIP_AUR -e SKIP_ARDUINO -e ASOS_IN_CONTAINER=1 \
+		-e SKIP_AUR -e SKIP_ARDUINO -e ASOS_IN_CONTAINER=1 -e ASOS_WITHOUT="$(tr '\n' ' ' <<<"$EXCLUDED")" \
 		-v "$ROOT:/build" -w /build \
 		docker.io/archlinux/archlinux:latest \
 		bash -c 'pacman -Syu --noconfirm --needed archiso base-devel git curl sudo arduino-cli && ./build.sh'
@@ -88,10 +113,29 @@ rm -rf "$ISO_WORK" "$PROFILE"
 mkdir -p "$WORK_DIR"
 cp -a "$ROOT/archiso" "$PROFILE"
 
-echo ":: Fetching zapret + Flowseal strategies"
-DEST="$PROFILE/airootfs/opt/zapret" "$ROOT/scripts/fetch-zapret.sh"
+# optional groups: mkarchiso gets the filtered plain lists; the full tagged lists
+# and the selector go into the image so asos-install can remove groups later
+"$ROOT/scripts/pkg-select.sh" "$ROOT/archiso/packages.x86_64" --without "$EXCLUDED" >"$PROFILE/packages.x86_64"
+"$ROOT/scripts/pkg-select.sh" "$ROOT/archiso/packages.aur" --without "$EXCLUDED" >"$PROFILE/packages.aur"
+install -Dm0644 "$ROOT/archiso/packages.x86_64" "$PROFILE/airootfs/usr/share/asos/packages.x86_64"
+install -Dm0755 "$ROOT/scripts/pkg-select.sh" "$PROFILE/airootfs/usr/share/asos/pkg-select.sh"
+install -Dm0755 "$ROOT/scripts/fetch-zapret.sh" "$PROFILE/airootfs/usr/share/asos/fetch-zapret.sh"
+{
+	echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%MZ)"
+	echo "GIT_COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+	echo "EXCLUDED_GROUPS=\"$(tr '\n' ' ' <<<"$EXCLUDED" | xargs)\""
+} >"$PROFILE/airootfs/usr/share/asos/build-info"
+echo ":: пакетов в образе: $(wc -l <"$PROFILE/packages.x86_64") (+ AUR: $(wc -l <"$PROFILE/packages.aur"))"
 
-if [[ "${SKIP_AUR:-0}" != 1 ]]; then
+if excluded zapret; then
+	echo ":: zapret отключён (--without zapret)"
+	rm -f "$PROFILE/airootfs/etc/systemd/system/multi-user.target.wants/zapret.service"
+else
+	echo ":: Fetching zapret + Flowseal strategies"
+	DEST="$PROFILE/airootfs/opt/zapret" "$ROOT/scripts/fetch-zapret.sh"
+fi
+
+if [[ "${SKIP_AUR:-0}" != 1 && -s "$PROFILE/packages.aur" ]]; then
 	echo ":: Building AUR packages"
 	"$ROOT/scripts/build-aur.sh" "$PROFILE/packages.aur" "$AUR_REPO"
 	if [[ -s "$AUR_REPO/built.txt" ]]; then
@@ -110,7 +154,7 @@ EOF
 	fi
 fi
 
-if [[ "${SKIP_ARDUINO:-0}" != 1 ]]; then
+if [[ "${SKIP_ARDUINO:-0}" != 1 ]] && ! excluded arduino; then
 	echo ":: Pre-installing Arduino cores and libraries"
 	"$ROOT/scripts/fetch-arduino.sh" "$PROFILE/airootfs/etc/skel"
 fi

@@ -3,3 +3,5 @@
 *.ps1 text eol=crlf
 *.png binary
 *.bin binary
+*.jpg binary
+*.psf.gz binary

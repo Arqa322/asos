@@ -34,6 +34,19 @@ jobs:
           $t = $null; $e = $null
           [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD/vm/create-vm.ps1", [ref]$t, [ref]$e)
           if ($e.Count) { $e | ForEach-Object { Write-Error ("{0}:{1} {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message) }; exit 1 }
+      - name: Executables keep their mode in the ISO (file_permissions)
+        run: scripts/check-permissions.sh
+      - name: Optional package groups
+        run: |
+          full=$(scripts/pkg-select.sh archiso/packages.x86_64 | wc -l)
+          raw=$(grep -v '^#' archiso/packages.x86_64 | sed 's/#.*//;s/[[:space:]]//g' | grep -v '^$' | sort -u | wc -l)
+          min=$(scripts/pkg-select.sh archiso/packages.x86_64 --without minimal | wc -l)
+          echo "all=$full raw=$raw minimal=$min"
+          [ "$full" -eq "$raw" ] && [ "$min" -lt "$full" ] && [ "$min" -gt 100 ]
+          for g in $(scripts/pkg-select.sh --resolve minimal); do
+            n=$(scripts/pkg-select.sh archiso/packages.x86_64 --only "$g" | wc -l); echo "  $g: $n"
+          done
+          if scripts/pkg-select.sh archiso/packages.x86_64 --without nosuchgroup >/dev/null 2>&1; then echo "::error::unknown group accepted"; exit 1; fi
       - name: Validate package lists against Arch repositories
         run: python3 scripts/check-packages.py
       - name: Validate hyprland.lua against the Hyprland version in Arch
@@ -49,6 +62,42 @@ jobs:
           for want in "unknown option general:gaps_inn" "decoration:rounding expects Int" "cursor:no_hardware_cursors expects Int" "unknown option misc:vfr" "unknown event" "closee"; do
             grep -q "$want" bad.txt || { echo "::error::checker missed: $want"; exit 1; }
           done
+
+  # Desktop configs checked by the real programs from the Arch repositories
+  desktop-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: archlinux/archlinux:latest
+    steps:
+      - name: Install Hyprland, fastfetch, starship, sway
+        run: pacman -Syu --noconfirm --needed git hyprland fastfetch starship sway mesa ttf-jetbrains-mono-nerd
+      - uses: actions/checkout@v5
+      - name: Prepare a test home with the ASOS skel
+        run: |
+          useradd -m tester
+          cp -a archiso/airootfs/etc/skel/. /home/tester/
+          cp -a archiso/airootfs/usr/share/asos /usr/share/
+          chown -R tester:tester /home/tester
+          install -d -m 0700 -o tester /tmp/xdg
+      - name: Hyprland --verify-config (hyprland.lua)
+        run: |
+          out=$(su tester -c 'export XDG_RUNTIME_DIR=/tmp/xdg HYPRLAND_HEADLESS_ONLY=1; Hyprland --verify-config -c ~/.config/hypr/hyprland.lua' 2>&1) && rc=0 || rc=$?
+          echo "$out" | tail -n 40
+          echo "exit code: $rc"
+          if [ "$rc" -ne 0 ] || echo "$out" | grep -q -i -E 'config error|error in|errors in'; then echo "::error::Hyprland rejected hyprland.lua"; exit 1; fi
+      - name: fastfetch with the ASOS config
+        run: |
+          out=$(su tester -c 'fastfetch --pipe true 2>&1')
+          echo "$out"
+          if echo "$out" | grep -q -i -E 'error|unknown|invalid'; then echo "::error::fastfetch reported a config problem"; exit 1; fi
+          echo "$out" | grep -q '▟███▛' || { echo "::error::ASOS logo missing"; exit 1; }
+      - name: starship prompt with the ASOS config
+        run: |
+          out=$(su tester -c 'cd ~ && starship print-config >/dev/null && starship prompt --status 0' 2>&1)
+          echo "$out"
+          if echo "$out" | grep -q -E 'WARN|ERROR'; then echo "::error::starship reported a config problem"; exit 1; fi
+      - name: sway --validate (safe graphics mode)
+        run: su tester -c 'sway --validate -c /usr/share/asos/sway/config'
 
   build:
     needs: check

@@ -35,7 +35,7 @@ local VM = in_vm()
 hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("mako")
-    hl.exec_cmd("swaybg -c '#1e1e2e'")
+    hl.exec_cmd("asos-wallpaper")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("nm-applet --indicator")
     hl.exec_cmd("blueman-applet")
@@ -170,6 +170,8 @@ hl.bind(mod .. " + SHIFT + S",   hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | swapp
 hl.bind("Print",                 hl.dsp.exec_cmd("grim - | wl-copy && notify-send 'Скриншот' 'Скопирован в буфер обмена'"))
 hl.bind(mod .. " + Escape",      hl.dsp.exec_cmd("kitty --title btop -e btop"))
 hl.bind(mod .. " + BackSpace",   hl.dsp.exec_cmd("asos-power"))
+hl.bind(mod .. " + W",           hl.dsp.exec_cmd("asos-wallpaper pick"))
+hl.bind(mod .. " + SHIFT + W",   hl.dsp.exec_cmd("asos-wallpaper next"))
 
 -- focus / move windows
 for _, dir in ipairs({ "left", "right", "up", "down" }) do

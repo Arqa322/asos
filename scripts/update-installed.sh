@@ -28,7 +28,7 @@ A="$SRC/archiso/airootfs"
 [[ -d "$A/usr/local/bin" ]] || { echo "download failed" >&2; exit 1; }
 
 info "пакеты: sway, foot, drm-info (безопасный графический режим)"
-pkgs=(sway foot drm-info mesa-utils)
+pkgs=(sway foot drm-info mesa-utils awww starship fastfetch kbd terminus-font)
 case "$(systemd-detect-virt --vm 2>/dev/null || true)" in
 	oracle) pkgs+=(virtualbox-guest-utils) ;;
 	vmware) pkgs+=(open-vm-tools) ;;
@@ -46,6 +46,18 @@ mkdir -p /usr/share/asos
 cp -a "$A/usr/share/asos/." /usr/share/asos/
 cp -a "$A/usr/share/applications/." /usr/share/applications/
 install -Dm0644 "$A/etc/udev/rules.d/70-asos-embedded.rules" /etc/udev/rules.d/70-asos-embedded.rules
+mkdir -p /usr/share/backgrounds
+cp -a "$A/usr/share/backgrounds/asos" /usr/share/backgrounds/
+install -Dm0644 "$SRC/archiso/packages.x86_64" /usr/share/asos/packages.x86_64
+install -Dm0755 "$SRC/scripts/pkg-select.sh" /usr/share/asos/pkg-select.sh
+install -Dm0755 "$SRC/scripts/fetch-zapret.sh" /usr/share/asos/fetch-zapret.sh
+# console look: Catppuccin palette, Terminus font, login banner, ASOS name
+install -Dm0644 "$A/etc/vtrgb" /etc/vtrgb
+install -Dm0644 "$A/etc/systemd/system/asos-vtrgb.service" /etc/systemd/system/asos-vtrgb.service
+systemctl enable asos-vtrgb.service 2>/dev/null || true
+install -Dm0644 "$A/etc/issue" /etc/issue
+install -Dm0644 "$A/etc/os-release" /etc/os-release.asos && mv -f /etc/os-release.asos /etc/os-release
+sed -i 's/^FONT=.*/FONT=ter-v18n/' /etc/vconsole.conf 2>/dev/null || true
 rm -f /etc/skel/.config/hypr/hyprland.conf /etc/skel/.config/hypr/user.conf
 cp -a "$A/etc/skel/." /etc/skel/
 udevadm control --reload 2>/dev/null || true
@@ -55,7 +67,7 @@ while IFS=: read -r user _ uid gid _ home shell; do
 	(( uid >= 1000 && uid < 60000 )) || continue
 	[[ -d "$home" && "$shell" != */nologin ]] || continue
 	info "пользователь $user: обновляю конфиги Hyprland/Waybar (старые — в *.bak-$stamp)"
-	for d in .config/hypr .config/waybar; do
+	for d in .config/hypr .config/waybar .config/kitty .config/fastfetch .config/starship.toml .bashrc; do
 		[[ -e "$home/$d" ]] && cp -a "$home/$d" "$home/$d.bak-$stamp"
 	done
 	mkdir -p "$home/.config/hypr" "$home/.config/waybar" "$home/.config/asos"
@@ -68,10 +80,16 @@ while IFS=: read -r user _ uid gid _ home shell; do
 		warn "  ~/.config/hypr/user.conf (старый формат) переименован в user.conf.old — перенесите свои настройки в user.lua"
 	fi
 	install -m 0644 "$A/etc/skel/.config/waybar/config.jsonc" "$A/etc/skel/.config/waybar/style.css" "$home/.config/waybar/"
+	mkdir -p "$home/.config/kitty" "$home/.config/fastfetch"
+	install -m 0644 "$A/etc/skel/.config/kitty/kitty.conf" "$home/.config/kitty/"
+	install -m 0644 "$A/etc/skel/.config/fastfetch/config.jsonc" "$A/etc/skel/.config/fastfetch/asos-logo.txt" "$home/.config/fastfetch/"
+	install -m 0644 "$A/etc/skel/.config/starship.toml" "$home/.config/starship.toml"
+	install -m 0644 "$A/etc/skel/.bashrc" "$home/.bashrc"
 	[[ -f "$home/.config/asos/sway.conf" ]] || install -m 0644 "$A/etc/skel/.config/asos/sway.conf" "$home/.config/asos/"
 	install -m 0644 "$A/etc/skel/.bash_profile" "$home/.bash_profile"
 	rm -f "$home/.local/state/asos/session/last-ok"
-	chown -R "$uid:$gid" "$home/.config/hypr" "$home/.config/waybar" "$home/.config/asos" "$home/.bash_profile"
+	chown -R "$uid:$gid" "$home/.config/hypr" "$home/.config/waybar" "$home/.config/asos" "$home/.config/kitty" \
+		"$home/.config/fastfetch" "$home/.config/starship.toml" "$home/.bash_profile" "$home/.bashrc"
 done </etc/passwd
 
 if [[ -d /boot/loader/entries && -f /boot/loader/entries/asos.conf ]]; then

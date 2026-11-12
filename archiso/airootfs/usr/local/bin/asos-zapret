@@ -225,7 +225,7 @@ run() {
 	exec "$ZAPRET_DIR/nfqws" --qnum="$QNUM" "${args[@]}" "${extra[@]}"
 }
 
-is_active() { systemctl is-active --quiet "$SERVICE"; }
+is_active() { systemctl is-active --quiet "$SERVICE" 2>/dev/null; }
 
 status() {
 	local st="${c_err}stopped${c_0}"
@@ -237,6 +237,16 @@ status() {
 	echo "atom pack     $([[ $ATOM_PACK == 1 ]] && echo on || echo off)"
 	[[ -r "$ZAPRET_DIR/VERSION" ]] && echo "${c_dim}$(tr '\n' ' ' <"$ZAPRET_DIR/VERSION")${c_0}"
 	return 0
+}
+
+brief() { # one line for fastfetch / scripts
+	if is_active; then
+		echo "работает · $STRATEGY · game: $GAME_FILTER · atom: $([[ $ATOM_PACK == 1 ]] && echo on || echo off)"
+	elif [[ -x "$ZAPRET_DIR/nfqws" ]]; then
+		echo "выключен (sudo asos-zapret start)"
+	else
+		echo "не установлен (sudo asos-groups add zapret)"
+	fi
 }
 
 waybar() {
@@ -357,6 +367,7 @@ ${c_b}asos-zapret${c_0} — zapret + Flowseal strategies for ASOS
   autotest               try all strategies, show results
   show                   print generated nfqws args and nft rules
   waybar                 JSON status for waybar
+  brief                  one-line status
 
 Config: $CONF   User lists: $USER_LISTS
 EOF
@@ -387,6 +398,7 @@ case "$cmd" in
 	fw-up) need_root fw-up; fw_up ;;
 	fw-down) need_root fw-down; fw_down ;;
 	waybar) waybar ;;
+	brief) brief ;;
 	-h|--help|help) usage ;;
 	*) usage; exit 1 ;;
 esac

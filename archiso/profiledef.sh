@@ -31,7 +31,11 @@ file_permissions=(
   ["/usr/local/bin/asos-nanopi"]="0:0:755"
   ["/usr/local/bin/asos-session"]="0:0:755"
   ["/usr/local/bin/asos-doctor"]="0:0:755"
+  ["/usr/local/bin/asos-wallpaper"]="0:0:755"
+  ["/usr/local/bin/asos-groups"]="0:0:755"
+  ["/usr/share/asos/fetch-zapret.sh"]="0:0:755"
   ["/usr/share/asos/embedded/examples/nanopi-hello/deploy.sh"]="0:0:755"
   ["/usr/share/asos/embedded/examples/serial-bridge.py"]="0:0:755"
+  ["/usr/share/asos/pkg-select.sh"]="0:0:755"
   ["/opt/zapret/nfqws"]="0:0:755"
 )

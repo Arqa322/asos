@@ -1,5 +1,11 @@
 # ============================================================
 #  ASOS package list (one package per line, '#' = comment)
+#
+#  Section headers with a [tag] are OPTIONAL groups that can be
+#  left out:  ./build.sh --without office,games   (or --minimal)
+#             bash i.sh --without office,games    (online installer)
+#  Sections without a tag are the core system.
+#  List the groups:  scripts/pkg-select.sh --list-groups
 # ============================================================
 
 # ---------- Base / live medium ----------
@@ -41,6 +47,16 @@ power-profiles-daemon
 zram-generator
 xdg-user-dirs
 xdg-utils
+pciutils
+usbutils
+curl
+rsync
+gptfdisk
+dosfstools
+btrfs-progs
+e2fsprogs
+exfatprogs
+ntfs-3g
 
 # ---------- Network ----------
 networkmanager
@@ -58,6 +74,7 @@ nftables
 openssh
 openvpn
 wireguard-tools
+dnsmasq
 
 # ---------- Hyprland desktop ----------
 hyprland
@@ -75,6 +92,7 @@ mako
 libnotify
 kitty
 swaybg
+awww
 grim
 slurp
 swappy
@@ -110,20 +128,14 @@ pavucontrol
 alsa-utils
 mpv
 imv
-obs-studio
 
-# ---------- Graphics drivers (Mesa / Vulkan, 64 + 32 bit) ----------
+# ---------- Graphics drivers (Mesa / Vulkan) ----------
 mesa
-lib32-mesa
 mesa-utils
 vulkan-icd-loader
-lib32-vulkan-icd-loader
 vulkan-radeon
-lib32-vulkan-radeon
 vulkan-intel
-lib32-vulkan-intel
 vulkan-nouveau
-lib32-vulkan-nouveau
 vulkan-tools
 intel-media-driver
 libva-utils
@@ -137,16 +149,11 @@ ttf-liberation
 ttf-jetbrains-mono-nerd
 otf-font-awesome
 
-# ---------- Internet / communication ----------
+# ---------- Browser ----------
 firefox
 firefox-i18n-ru
-thunderbird
-thunderbird-i18n-ru
-telegram-desktop
-discord
-qbittorrent
 
-# ---------- Office (LibreOffice + friends) ----------
+# ---------- [office] Office (LibreOffice + friends) ----------
 libreoffice-fresh
 libreoffice-fresh-ru
 hunspell
@@ -161,10 +168,29 @@ xournalpp
 mousepad
 qalculate-gtk
 keepassxc
-gimp
 simple-scan
 
-# ---------- Atom game pack ----------
+# ---------- [communication] Communication: mail, messengers, torrents ----------
+thunderbird
+thunderbird-i18n-ru
+telegram-desktop
+discord
+qbittorrent
+
+# ---------- [media] Media: streaming/recording, image editing ----------
+obs-studio
+gimp
+
+# ---------- [vscode] VS Code (Code - OSS) ----------
+code
+
+# ---------- [games] Atom game pack ----------
+# 32-bit drivers are needed only by Steam/Wine
+lib32-mesa
+lib32-vulkan-icd-loader
+lib32-vulkan-radeon
+lib32-vulkan-intel
+lib32-vulkan-nouveau
 steam
 lutris
 wine-staging
@@ -180,7 +206,7 @@ prismlauncher
 lib32-pipewire
 lib32-libpulse
 
-# ---------- Embedded: Arduino / microcontrollers ----------
+# ---------- [arduino] Embedded: Arduino / microcontrollers ----------
 # (Arduino IDE 2, tio, cutecom, mpremote come from AUR: see archiso/packages.aur)
 arduino-cli
 arduino-language-server
@@ -201,9 +227,8 @@ moserial
 pulseview
 sigrok-cli
 sigrok-firmware-fx2lafw
-code
 
-# ---------- Embedded: NanoPi / ARM single-board computers ----------
+# ---------- [nanopi] Embedded: NanoPi / ARM single-board computers ----------
 # (rkdeveloptool and xfel come from AUR: see archiso/packages.aur)
 aarch64-linux-gnu-gcc
 aarch64-linux-gnu-gdb
@@ -225,7 +250,7 @@ ninja
 meson
 ccache
 
-# ---------- Sysadmin: monitoring / diagnostics ----------
+# ---------- [monitoring] Sysadmin: monitoring / diagnostics ----------
 htop
 btop
 nvtop
@@ -244,14 +269,11 @@ dmidecode
 lshw
 hwinfo
 inxi
-fastfetch
-usbutils
-pciutils
 smartmontools
 hdparm
 nvme-cli
 
-# ---------- Sysadmin: network tools ----------
+# ---------- [nettools] Sysadmin: network tools ----------
 nmap
 wireshark-qt
 termshark
@@ -272,7 +294,6 @@ socat
 arp-scan
 ipcalc
 speedtest-cli
-curl
 wget
 aria2
 sshfs
@@ -282,11 +303,10 @@ tigervnc
 filezilla
 putty
 
-# ---------- Sysadmin: disks / backup / recovery ----------
+# ---------- [disktools] Sysadmin: disks / backup / recovery ----------
 gparted
 gnome-disk-utility
 parted
-gptfdisk
 testdisk
 ddrescue
 partclone
@@ -295,27 +315,20 @@ clonezilla
 lvm2
 mdadm
 cryptsetup
-btrfs-progs
 xfsprogs
 f2fs-tools
-dosfstools
-exfatprogs
-ntfs-3g
-e2fsprogs
-rsync
 rclone
 restic
 borg
 chntpw
 
-# ---------- Sysadmin: virtualization / containers / IaC ----------
+# ---------- [virt] Sysadmin: virtualization / containers / IaC ----------
 docker
 docker-compose
 docker-buildx
 qemu-desktop
 libvirt
 virt-manager
-dnsmasq
 edk2-ovmf
 ansible
 opentofu
@@ -323,11 +336,13 @@ kubectl
 helm
 k9s
 
-# ---------- Sysadmin: security ----------
+# ---------- [security] Sysadmin: security ----------
 lynis
 clamav
 
 # ---------- CLI essentials ----------
+fastfetch
+starship
 git
 vim
 neovim

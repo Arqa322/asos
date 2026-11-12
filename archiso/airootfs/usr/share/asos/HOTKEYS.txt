@@ -22,6 +22,7 @@
  SUPER + стрелки        фокус;  + Shift — переместить окно
  SUPER + ЛКМ / ПКМ      двигать / менять размер окна
  SUPER + Backspace      меню питания (блокировка, выход, перезагрузка)
+ SUPER + W              выбрать обои (с предпросмотром),  + Shift — следующие
  SUPER + Shift + E      выйти из сеанса
  Alt + Shift            раскладка EN/RU
 
@@ -34,6 +35,9 @@
  asos-nanopi            NanoPi: boards, find, console, flash, share, chroot ...
  pio                    PlatformIO Core;  esptool / mpremote — ESP32 и MicroPython
  asos-doctor            диагностика графики (почему не запускается Hyprland)
+ asos-groups list       группы программ; sudo asos-groups add|remove office,games ...
+ asos-wallpaper         обои: pick | next | random | set FILE (свои — в ~/Изображения/Wallpapers)
+ ff                     fastfetch — сводка о системе
  asos-session --set M   режим графики: hyprland-vm | hyprland-software | sway-software
  sudo asos-install      установка ASOS на диск
  btop / htop / glances  мониторинг
