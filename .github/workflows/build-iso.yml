@@ -101,7 +101,7 @@ jobs:
         # container refuses to exec; a plain copy is enough to parse the config
         run: |
           cp "$(command -v sway)" /usr/local/bin/sway-nocap
-          su tester -c 'XDG_RUNTIME_DIR=/tmp/xdg sway-nocap --validate -c /usr/share/asos/sway/config'
+          su tester -c 'XDG_RUNTIME_DIR=/tmp/xdg WLR_BACKENDS=headless WLR_RENDERER=pixman sway-nocap --validate -c /usr/share/asos/sway/config'
 
   build:
     needs: check
