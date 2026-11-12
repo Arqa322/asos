@@ -134,6 +134,6 @@ element selected.normal { background-color: @pick; text-color: @snow; }
 element selected.active { background-color: @pick; text-color: @honey; }
 element selected.urgent { background-color: @berry; text-color: @ink0; }
 element-icon { size: 26px; cursor: inherit; vertical-align: 0.5; }
-element-text { text-color: inherit; cursor: inherit; vertical-align: 0.5; highlight: bold @amber; }
+element-text { text-color: inherit; cursor: inherit; vertical-align: 0.5; highlight: bold #f2a33a; }
 
 error-message { padding: 18px; border-radius: 16px; background-color: @panel; }
