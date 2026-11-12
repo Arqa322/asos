@@ -121,7 +121,7 @@ jobs:
         run: |
           for t in huilo huilo-list huilo-power huilo-grid; do
             out=$(su tester -c "rofi -theme $t -dump-theme" 2>&1) || { echo "$out"; echo "::error::rofi failed on $t"; exit 1; }
-            if echo "$out" | grep -q -i -E 'failed to parse|error'; then echo "$out" | head -20; echo "::error::rofi theme $t"; exit 1; fi
+            if echo "$out" | grep -q -i -E 'failed to parse|rofi-warning|rofi-critical'; then echo "$out" | head -20; echo "::error::rofi theme $t"; exit 1; fi
             echo "$out" | grep -q 'imagebox\|listview' || { echo "::error::rofi theme $t looks empty"; exit 1; }
             echo "ok: $t"
           done
