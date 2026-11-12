@@ -139,16 +139,21 @@ jobs:
           echo ok
       - name: waybar, swaync and swayosd start with the Huilo styles (headless sway)
         run: |
-          cp "$(command -v sway)" /usr/local/bin/sway-nocap
+          cp "$(command -v sway)" /usr/local/bin/sway-headless
           printf 'output HEADLESS-1 resolution 1920x1080\n' >/tmp/test-sway.conf
+          # swayosd talks to logind/upower over the system bus
+          mkdir -p /run/dbus && dbus-daemon --system --fork || true
           su tester -c 'export XDG_RUNTIME_DIR=/tmp/xdg WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1; dbus-run-session -- sh -c "
-            sway-nocap -c /tmp/test-sway.conf >/tmp/sway.log 2>&1 &
+            sway-headless -c /tmp/test-sway.conf >/tmp/sway.log 2>&1 &
+            SWAY=\$!
             for i in \$(seq 1 50); do [ -S /tmp/xdg/wayland-1 ] && break; sleep 0.2; done
             export WAYLAND_DISPLAY=wayland-1 GSK_RENDERER=cairo
             timeout 8 waybar -c /usr/share/huilo/sway/waybar.jsonc -s ~/.config/waybar/style.css >/tmp/waybar.log 2>&1
             timeout 6 swaync -c ~/.config/swaync/config.json -s ~/.config/swaync/style.css >/tmp/swaync.log 2>&1
             timeout 5 swayosd-server >/tmp/swayosd.log 2>&1
+            kill \$SWAY; wait \$SWAY
             true"' || true
+          pkill -x sway-headless || true
           bad=0
           for f in waybar swaync swayosd; do
             echo "::group::$f"; cat /tmp/$f.log; echo "::endgroup::"
