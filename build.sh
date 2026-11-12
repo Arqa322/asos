@@ -24,7 +24,9 @@
 #    SKIP_AUR=1       do not build AUR packages
 #    SKIP_ARDUINO=1   do not pre-install Arduino cores/libraries
 #    OUT_DIR          default ./out
-#    WORK_DIR         default ./work
+#    WORK_DIR         default ./work   (both may be on another disk, also with --docker)
+#    PKG_CACHE        --docker only: host folder for the pacman package cache
+#                     (keeps ~6 GB of downloads between builds / off the system disk)
 # ============================================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,10 +53,17 @@ excluded() { grep -qx "$1" <<<"$EXCLUDED"; }
 
 if [[ $DOCKER == 1 ]]; then
 	engine=$(command -v docker || command -v podman) || { echo "docker/podman not found" >&2; exit 1; }
+	# work/out/cache folders outside the repository are mounted at the paths the
+	# build inside the container uses
+	mounts=(-v "$ROOT:/build")
+	mkdir -p "$WORK_DIR" "$OUT_DIR"
+	[[ "$(realpath -m "$WORK_DIR")" == "$(realpath -m "$ROOT/work")" ]] || mounts+=(-v "$(realpath "$WORK_DIR"):/build/work")
+	[[ "$(realpath -m "$OUT_DIR")" == "$(realpath -m "$ROOT/out")" ]] || mounts+=(-v "$(realpath "$OUT_DIR"):/build/out")
+	if [[ -n "${PKG_CACHE:-}" ]]; then mkdir -p "$PKG_CACHE"; mounts+=(-v "$(realpath "$PKG_CACHE"):/var/cache/pacman/pkg"); fi
 	exec "$engine" run --rm --privileged \
-		-e ZAPRET_VERSION -e FLOWSEAL_REF -e ARDUINO_CORES -e ARDUINO_LIBS \
+		-e ZAPRET_VERSION -e FLOWSEAL_REF -e ARDUINO_CORES -e ARDUINO_LIBS -e NEED_GB -e IGNORE_SPACE \
 		-e SKIP_AUR -e SKIP_ARDUINO -e HUILO_IN_CONTAINER=1 -e HUILO_WITHOUT="$(tr '\n' ' ' <<<"$EXCLUDED")" \
-		-v "$ROOT:/build" -w /build \
+		"${mounts[@]}" -w /build \
 		docker.io/archlinux/archlinux:latest \
 		bash -c 'pacman -Syu --noconfirm --needed archiso base-devel git curl sudo arduino-cli && ./build.sh'
 fi

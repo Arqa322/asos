@@ -176,7 +176,7 @@ sequenceDiagram
 |---|---|
 | `check` | синтаксис bash/PowerShell; права исполняемых файлов; тема собрана из палитры (`make-theme.py --check`); группы пакетов; **все пакеты есть в репозиториях Arch и зависимости разрешаются** (`check-packages.py`); hyprland.lua против API Hyprland из исходников той же версии; что проверщик ловит сломанный конфиг; ИИ-помощник против фальшивого сервера |
 | `desktop-config` | настоящие программы из Arch в контейнере: `Hyprland --verify-config`, fastfetch, starship, тема Plymouth, пресеты EasyEffects, rofi читает темы, kitty и dialog — свои конфиги, waybar/swaync/swayosd запускаются в headless sway без ошибок стилей, `sway --validate` |
-| `build` | полная сборка ISO (артефакт; при теге `v*` — релиз) |
+| `build` | полная сборка ISO (по кнопке Run workflow или по тегу `v*`), затем **тест загрузки** в QEMU: UEFI-загрузка как в VirtualBox и запуск с журналом на последовательном порту, снимки экрана и журнал — в артефакте `boot-test`; ISO — в артефакте `huilo-iso`, при теге — релиз |
 
 ## 7. Технологии
 

@@ -39,7 +39,7 @@ all_modes() {
 	fi
 }
 
-say() { echo -e "\e[1;36m[huilo-session]\e[0m $*"; echo "$(date '+%F %T') $*" >>"$STATE/session.log"; }
+say() { echo -e "\e[1;36m[huilo-session]\e[0m $*"; echo "$(date '+%F %T') $*" >>"$STATE/session.log"; logger -t huilo-session -- "$*" 2>/dev/null || true; }
 
 case "${1:-}" in
 	--set)

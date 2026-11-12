@@ -187,5 +187,8 @@ scripts/tests/test-huilo-ai.sh                                      # ИИ-по�
 scripts/pkg-select.sh --list-groups                                 # группы пакетов читаются
 ```
 
-Остальное (настоящий Hyprland, rofi, waybar, swaync, сборка ISO) проверит CI. Полную сборку локально:
-`sudo ./build.sh` на Arch или `./build.sh --docker` где угодно (нужно ~40 ГБ свободного места).
+Остальное (настоящий Hyprland, rofi, waybar, swaync) проверит CI. Полную сборку ISO с тестом загрузки запускайте
+перед релизом: GitHub → Actions → Build Huilo ISO → Run workflow; снимки экрана загрузки — в артефакте `boot-test`.
+Локально: `sudo ./build.sh` на Arch или `./build.sh --docker` где угодно (нужно ~40 ГБ; другой диск —
+`WORK_DIR=/диск/work OUT_DIR=/диск/out PKG_CACHE=/диск/pkg ./build.sh --docker`), затем
+`scripts/tests/boot-iso.sh out/huilo-*.iso` (нужны qemu, ovmf, xorriso, socat).

@@ -5,3 +5,4 @@
 /archiso/airootfs/opt/zapret/
 __pycache__/
 *.pyc
+.build/
