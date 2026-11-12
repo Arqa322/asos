@@ -1,0 +1,25 @@
+# ============================================================================
+#  Old command names that still work (see docs/MAINTAINING.md, "Legacy").
+#  huilo-legacy reads this table: it prints a short notice and runs the new
+#  command with the same arguments. Format (tab or spaces):
+#
+#    old-name    new command (may include arguments)    since    remove-after
+#
+#  To retire a name: keep it here for at least two releases, then delete the
+#  line and the symlink in /usr/local/lib/huilo/legacy (or /usr/local/bin).
+# ============================================================================
+huilo-power     huilo-menu power        2026.11   2027.06
+asos-zapret     huilo-zapret            2026.10   2027.06
+asos-install    huilo-install           2026.10   2027.06
+asos-welcome    huilo-welcome           2026.10   2027.06
+asos-game       huilo-game              2026.10   2027.06
+asos-power      huilo-menu power        2026.10   2027.06
+asos-arduino    huilo-arduino           2026.10   2027.06
+asos-nanopi     huilo-nanopi            2026.10   2027.06
+asos-session    huilo-session           2026.10   2027.06
+asos-doctor     huilo-doctor            2026.10   2027.06
+asos-wallpaper  huilo-wallpaper         2026.10   2027.06
+asos-groups     huilo-groups            2026.10   2027.06
+asos-logs       huilo-logs              2026.10   2027.06
+asos-logwatch   huilo-logwatch          2026.10   2027.06
+asos-eq         huilo-eq                2026.10   2027.06

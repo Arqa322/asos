@@ -1,0 +1,15 @@
+# huilo-logwatch: known harmless errors (extended regex on "identifier: message").
+# Your own additions: ~/.config/huilo/logwatch-ignore
+^kernel: .*ACPI (BIOS )?Error
+^kernel: .*ACPI: .*(AE_NOT_FOUND|AE_ALREADY_EXISTS)
+^kernel: .*(Direct firmware load|firmware: failed to load).*(iwlwifi|rtw|brcm|regulatory)
+^kernel: .*(hid-generic|usbhid).*(failed|error)
+^kernel: .*x86/cpu: SGX disabled
+^bluetoothd: .*(Failed to set (mode|privacy)|src/plugin\.c|profiles/.*Unable to)
+^wireplumber: .*(spa\.bluez5|SPA handle|libcamera)
+^gnome-keyring-daemon: 
+^(kwin_wayland|Xwayland): 
+^systemd-logind: .*(Failed to get session|Failed to start user)
+^xdg-desktop-por: 
+^dbus-broker-launch: .*(Ignoring duplicate|Invalid group)
+^sudo: .*(pam_unix|conversation failed)

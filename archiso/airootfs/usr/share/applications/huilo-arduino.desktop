@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Arduino: помощник Huilo
+Comment=Диагностика портов, загрузка скетчей, монитор, ядра ESP32/RP2040/STM32
+Exec=kitty --class huilo-float --title huilo-arduino -e huilo-arduino menu
+Icon=applications-electronics
+Terminal=false
+Type=Application
+Categories=Development;Electronics;
+Keywords=arduino;esp32;esp8266;rp2040;stm32;serial;

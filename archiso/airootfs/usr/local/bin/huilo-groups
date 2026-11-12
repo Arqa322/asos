@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-groups — add or remove optional Huilo software groups after install
+#
+#    huilo-groups list                    groups and whether they are installed
+#    sudo huilo-groups add office,games   install groups
+#    sudo huilo-groups remove games       remove groups (packages + unused deps)
+#
+#  Groups: office communication media vscode games arduino nanopi monitoring
+#          nettools disktools virt security zapret aur
+#  Aliases: sysadmin, embedded, all
+# ============================================================================
+set -euo pipefail
+SHARE=/usr/share/huilo
+LIST="$SHARE/packages.x86_64"
+SEL="$SHARE/pkg-select.sh"
+AUR_HINT_arduino="arduino-ide-bin tio cutecom mpremote"
+AUR_HINT_nanopi="rkdeveloptool-git xfel"
+
+die() { echo -e "\e[31merror:\e[0m $*" >&2; exit 1; }
+info() { echo -e "\e[32m::\e[0m $*"; }
+[[ -r "$LIST" && -x "$SEL" ]] || die "нет $LIST или $SEL — обновите систему: update-installed.sh"
+
+group_pkgs() { "$SEL" "$LIST" --only "$1"; }
+installed_of() { comm -12 <(group_pkgs "$1" | sort) <(pacman -Qq | sort); }
+
+status() { # prints: installed | partial | absent
+	local g=$1 total have
+	case "$g" in
+		zapret) systemctl is-enabled --quiet zapret.service 2>/dev/null && echo installed || echo absent; return ;;
+		aur) pacman -Qq yay-bin yay >/dev/null 2>&1 && echo installed || echo absent; return ;;
+	esac
+	total=$(group_pkgs "$g" | wc -l); have=$(installed_of "$g" | wc -l)
+	if (( have == 0 )); then echo absent; elif (( have == total )); then echo installed; else echo "partial $have/$total"; fi
+}
+
+cmd_list() {
+	local g st
+	while read -r g desc; do
+		st=$(status "$g")
+		case "$st" in
+			installed) printf '  \e[32m✔\e[0m %-14s %s\n' "$g" "$desc" ;;
+			absent)    printf '  \e[2m·\e[0m %-14s %s\n' "$g" "$desc" ;;
+			*)         printf '  \e[33m◐\e[0m %-14s %s (%s)\n' "$g" "$desc" "$st" ;;
+		esac
+	done < <("$SEL" --list-groups | grep -v 'алиасы' | sed 's/^ *//')
+}
+
+need_root() { [[ $EUID -eq 0 ]] || exec sudo -- "$0" "$@"; }
+
+cmd_add() {
+	local g pkgs=()
+	for g in $("$SEL" --resolve "$1"); do
+		case "$g" in
+			zapret)
+				if [[ ! -x /opt/zapret/nfqws ]]; then
+					info "скачиваю zapret + Flowseal"
+					DEST=/opt/zapret bash "$SHARE/fetch-zapret.sh"
+				fi
+				systemctl enable --now zapret.service; info "zapret включён" ;;
+			aur) info "yay: git clone https://aur.archlinux.org/yay-bin.git && cd yay-bin && makepkg -si" ;;
+			*)
+				mapfile -t -O "${#pkgs[@]}" pkgs < <(group_pkgs "$g")
+				local h="AUR_HINT_$g"; [[ -n "${!h:-}" ]] && info "$g: пакеты из AUR ставятся отдельно: yay -S ${!h}" ;;
+		esac
+	done
+	if [[ ${#pkgs[@]} -gt 0 ]]; then
+		info "установка: ${#pkgs[@]} пакетов"
+		pacman -Sy --needed --noconfirm "${pkgs[@]}"
+	fi
+	return 0
+}
+
+cmd_remove() {
+	local g have=() failed=()
+	for g in $("$SEL" --resolve "$1"); do
+		case "$g" in
+			zapret) systemctl disable --now zapret.service 2>/dev/null || true; info "zapret выключен" ;;
+			aur) pacman -Qq yay-bin >/dev/null 2>&1 && pacman -Rns --noconfirm yay-bin ;;
+			*)
+				mapfile -t -O "${#have[@]}" have < <(installed_of "$g")
+				local h="AUR_HINT_$g" p
+				for p in ${!h:-}; do pacman -Qq "$p" >/dev/null 2>&1 && have+=("$p"); done ;;
+		esac
+	done
+	[[ ${#have[@]} -gt 0 ]] || { info "нечего удалять"; return 0; }
+	info "удаление: ${#have[@]} пакетов (и их ставших ненужными зависимостей)"
+	if ! pacman -Rns --noconfirm "${have[@]}"; then
+		# something outside these groups still needs a package: remove the rest one by one
+		local p
+		for p in "${have[@]}"; do
+			pacman -Qq "$p" >/dev/null 2>&1 || continue
+			pacman -Rns --noconfirm "$p" >/dev/null 2>&1 || failed+=("$p")
+		done
+		[[ ${#failed[@]} -eq 0 ]] || info "оставлены (нужны другим программам): ${failed[*]}"
+	fi
+	return 0
+}
+
+case "${1:-list}" in
+	list) cmd_list ;;
+	add) need_root "$@"; cmd_add "${2:?укажите группы, например: office,games}" ;;
+	remove|rm) need_root "$@"; cmd_remove "${2:?укажите группы, например: games}" ;;
+	-h|--help|help) sed -n '2,12p' "$0" ;;
+	*) sed -n '2,12p' "$0"; exit 1 ;;
+esac

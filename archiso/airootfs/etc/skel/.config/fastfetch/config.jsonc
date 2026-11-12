@@ -1,0 +1,39 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "file",
+    "source": "~/.config/fastfetch/huilo-logo.txt",
+    "color": { "1": "blue", "2": "magenta", "3": "white" },
+    "padding": { "top": 1, "left": 2, "right": 4 }
+  },
+  "display": {
+    "separator": "  ",
+    "color": { "keys": "blue", "output": "white", "separator": "90" },
+    "key": { "width": 15 }
+  },
+  "modules": [
+    { "type": "title", "format": "{user-name-colored}{at-symbol-colored}{host-name-colored}" },
+    { "type": "custom", "format": "╭──────────── 󰣇 Система ────────────", "outputColor": "90" },
+    { "type": "os",       "key": "│  ОС",        "keyColor": "blue" },
+    { "type": "kernel",   "key": "│  Ядро",      "keyColor": "blue" },
+    { "type": "uptime",   "key": "│ 󰔟 Работает",  "keyColor": "blue" },
+    { "type": "packages", "key": "│ 󰏖 Пакеты",    "keyColor": "blue" },
+    { "type": "shell",    "key": "│  Оболочка",  "keyColor": "blue" },
+    { "type": "wm",       "key": "│  Окна",      "keyColor": "blue" },
+    { "type": "terminal", "key": "│  Терминал",  "keyColor": "blue" },
+    { "type": "custom", "format": "├──────────── 󰍛 Железо ─────────────", "outputColor": "90" },
+    { "type": "host",     "key": "│ 󰌢 Модель",    "keyColor": "magenta" },
+    { "type": "cpu",      "key": "│  Процессор", "keyColor": "magenta", "showPeCoreCount": true },
+    { "type": "gpu",      "key": "│ 󰢮 Видео",     "keyColor": "magenta" },
+    { "type": "memory",   "key": "│  Память",    "keyColor": "magenta" },
+    { "type": "disk",     "key": "│ 󰋊 Диск",      "keyColor": "magenta", "folders": "/" },
+    { "type": "display",  "key": "│ 󰍹 Экран",     "keyColor": "magenta", "compactType": "original-with-refresh-rate" },
+    { "type": "custom", "format": "├──────────── 󰖩 Сеть и Huilo ────────", "outputColor": "90" },
+    { "type": "localip",  "key": "│ 󰩟 IP",        "keyColor": "cyan", "showIpv4": true, "showIpv6": false, "compact": true },
+    { "type": "command",  "key": "│ 󰒃 zapret",    "keyColor": "cyan", "text": "huilo-zapret brief 2>/dev/null || echo 'не установлен'" },
+    { "type": "command",  "key": "│ 󰹑 Графика",   "keyColor": "cyan", "text": "cat ~/.local/state/huilo/session/last-ok 2>/dev/null || echo 'автовыбор'" },
+    { "type": "custom", "format": "╰───────────────────────────────────", "outputColor": "90" },
+    "break",
+    { "type": "colors", "symbol": "circle", "paddingLeft": 2 }
+  ]
+}

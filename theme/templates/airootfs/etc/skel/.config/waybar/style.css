@@ -1,0 +1,118 @@
+/* Huilo bar: floating islands on a transparent strip. Colours: theme/palette.toml */
+* {
+    font-family: "@{font.ui}", "@{font.mono}", sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+}
+
+window#waybar {
+    background: transparent;
+    color: @{snow};
+}
+
+tooltip {
+    background: rgba(@{ink1.rgb}, 0.96);
+    border: 1px solid rgba(@{amber.rgb}, 0.35);
+    border-radius: 12px;
+}
+tooltip label { color: @{snow}; padding: 4px 6px; }
+
+/* islands */
+.modules-left, .modules-center, .modules-right {
+    background: rgba(@{ink1.rgb}, 0.78);
+    border: 1px solid rgba(@{ink4.rgb}, 0.9);
+    border-radius: 16px;
+    padding: 0 6px;
+}
+.modules-left  { margin-left: 2px; }
+.modules-right { margin-right: 2px; }
+
+#custom-launcher {
+    color: @{ink0};
+    background: linear-gradient(135deg, @{amber}, @{ember});
+    border-radius: 11px;
+    margin: 4px 4px 4px 0;
+    padding: 0 11px 0 9px;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+/* workspaces: small dots, the active one stretches into an amber pill */
+#workspaces { margin: 0 4px; }
+#workspaces button {
+    color: @{mist};
+    background: rgba(@{ink4.rgb}, 0.7);
+    margin: 9px 3px;
+    padding: 0;
+    min-width: 12px;
+    border-radius: 99px;
+    font-size: 0;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#workspaces button.empty   { background: rgba(@{ink4.rgb}, 0.45); }
+#workspaces button:hover   { background: @{fog}; }
+#workspaces button.active  { min-width: 30px; background: linear-gradient(90deg, @{amber}, @{ember}); }
+#workspaces button.urgent  { background: @{berry}; }
+#workspaces button.special { background: @{heather}; }
+
+#window { color: @{fog}; padding: 0 8px; }
+window#waybar.empty #window { padding: 0; }
+
+#clock {
+    color: @{snow};
+    font-weight: 700;
+    padding: 0 12px;
+}
+#clock.date { color: @{mist}; font-weight: 500; padding-left: 0; }
+
+#custom-health, #custom-zapret, #custom-notifications, #language, #pulseaudio,
+#network, #bluetooth, #cpu, #memory, #temperature, #battery, #tray, #custom-power,
+#idle_inhibitor {
+    color: @{fog};
+    padding: 0 9px;
+    margin: 5px 1px;
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+#custom-health:hover, #custom-zapret:hover, #custom-notifications:hover, #language:hover,
+#pulseaudio:hover, #network:hover, #bluetooth:hover, #cpu:hover, #memory:hover,
+#battery:hover, #custom-power:hover, #idle_inhibitor:hover {
+    background: rgba(@{ink3.rgb}, 0.95);
+    color: @{snow};
+}
+
+#cpu, #memory, #temperature { color: @{mist}; padding: 0 6px; }
+#pulseaudio { color: @{honey}; }
+#pulseaudio.muted { color: @{mist}; }
+#network.disconnected, #bluetooth.off, #bluetooth.disabled { color: @{mist}; }
+#language { color: @{glacier}; font-weight: 700; }
+#idle_inhibitor.activated { color: @{amber}; }
+
+#custom-zapret.on  { color: @{pine}; }
+#custom-zapret.off { color: @{berry}; }
+
+#custom-health        { padding: 0 0; margin: 5px 0; }
+#custom-health.ok     { color: @{pine}; padding: 0 7px; }
+#custom-health.error  { color: @{ink0}; background: @{honey}; padding: 0 9px; }
+#custom-health.critical { color: @{snow}; background: @{berry}; padding: 0 9px; }
+
+#custom-notifications.notification, #custom-notifications.dnd-notification { color: @{amber}; }
+#custom-notifications.dnd-none, #custom-notifications.dnd-notification { color: @{mist}; }
+
+#battery.charging        { color: @{pine}; }
+#battery.warning:not(.charging)  { color: @{honey}; }
+#battery.critical:not(.charging) { color: @{snow}; background: @{berry}; }
+#temperature.critical    { color: @{berry}; }
+
+#tray > .passive        { -gtk-icon-effect: dim; }
+#tray > .needs-attention { background: rgba(@{berry.rgb}, 0.25); border-radius: 8px; }
+#tray menu { background: @{ink1}; color: @{snow}; border-radius: 10px; }
+
+#custom-power { color: @{ember}; margin-right: 0; padding: 0 11px 0 9px; }
+
+/* safe graphics mode (sway): a visible reminder */
+#custom-safe { color: @{ink0}; background: @{honey}; padding: 0 10px; margin: 5px 2px; border-radius: 10px; font-weight: 700; }
+#mode { color: @{ink0}; background: @{amber}; padding: 0 10px; margin: 5px 2px; border-radius: 10px; }

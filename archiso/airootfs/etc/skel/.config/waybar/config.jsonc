@@ -1,0 +1,236 @@
+// generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy)
+// Huilo bar (Hyprland). Your changes: edit this file in ~/.config/waybar
+{
+    "layer": "top",
+    "position": "top",
+    "height": 36,
+    "margin-top": 8,
+    "margin-left": 12,
+    "margin-right": 12,
+    "spacing": 0,
+    "reload_style_on_change": true,
+    "modules-left": [
+        "custom/launcher",
+        "hyprland/workspaces",
+        "hyprland/window"
+    ],
+    "modules-center": [
+        "clock",
+        "clock#date"
+    ],
+    "modules-right": [
+        "tray",
+        "custom/health",
+        "custom/zapret",
+        "hyprland/language",
+        "group/system",
+        "network",
+        "bluetooth",
+        "pulseaudio",
+        "battery",
+        "idle_inhibitor",
+        "custom/notifications",
+        "custom/power"
+    ],
+    "custom/launcher": {
+        "format": "H",
+        "tooltip-format": "Приложения (SUPER+D)\nПКМ — все меню Huilo",
+        "on-click": "huilo-menu apps",
+        "on-click-right": "huilo-menu hub"
+    },
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "format-icons": {
+            "default": "",
+            "active": "",
+            "empty": "",
+            "urgent": "",
+            "special": ""
+        },
+        "persistent-workspaces": {
+            "*": 5
+        },
+        "show-special": true,
+        "tooltip": false,
+        "on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
+        "on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'"
+    },
+    "hyprland/window": {
+        "max-length": 48,
+        "separate-outputs": true,
+        "icon": false,
+        "rewrite": {
+            "(.*) — Mozilla Firefox": "󰈹  $1",
+            "(.*) - Visual Studio Code": "󰨞  $1"
+        }
+    },
+    "clock": {
+        "format": "{:%H:%M}",
+        "tooltip-format": "<tt>{calendar}</tt>",
+        "locale": "ru_RU.UTF-8",
+        "calendar": {
+            "mode": "month",
+            "mode-mon-col": 3,
+            "weeks-pos": "",
+            "on-scroll": 1,
+            "format": {
+                "months": "<span color='#ece7dc'><b>{}</b></span>",
+                "weekdays": "<span color='#8a91a5'>{}</span>",
+                "today": "<span color='#f2a33a'><b><u>{}</u></b></span>"
+            }
+        },
+        "actions": {
+            "on-scroll-up": "shift_down",
+            "on-scroll-down": "shift_up"
+        }
+    },
+    "clock#date": {
+        "format": "{:L%a, %d %b}",
+        "locale": "ru_RU.UTF-8",
+        "tooltip": false
+    },
+    "custom/health": {
+        "exec": "huilo-logwatch status",
+        "return-type": "json",
+        "interval": 30,
+        "signal": 9,
+        "format": "{}",
+        "on-click": "kitty --class huilo-float --title huilo-logwatch -e sh -c 'huilo-logwatch show; read -rp Enter _'",
+        "on-click-right": "huilo-logwatch ack",
+        "on-click-middle": "kitty --class huilo-float --title huilo-logs -e sh -c 'huilo-logs; read -rp Enter _'"
+    },
+    "custom/zapret": {
+        "exec": "huilo-zapret waybar",
+        "return-type": "json",
+        "interval": 5,
+        "format": "{}",
+        "on-click": "kitty --class huilo-float --title huilo-zapret -e huilo-zapret menu",
+        "on-click-right": "sudo -n huilo-zapret toggle || kitty --class huilo-float -e sudo huilo-zapret toggle"
+    },
+    "hyprland/language": {
+        "format": "{short}",
+        "tooltip": false
+    },
+    "group/system": {
+        "orientation": "horizontal",
+        "modules": [
+            "cpu",
+            "memory",
+            "temperature"
+        ],
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "system-child",
+            "transition-left-to-right": false
+        }
+    },
+    "cpu": {
+        "format": " {usage}%",
+        "interval": 3,
+        "on-click": "kitty --class huilo-float --title btop -e btop"
+    },
+    "memory": {
+        "format": "󰍛 {percentage}%",
+        "interval": 5,
+        "tooltip-format": "Память: {used:0.1f} из {total:0.1f} ГБ\nПодкачка: {swapUsed:0.1f} ГБ"
+    },
+    "temperature": {
+        "critical-threshold": 85,
+        "format": " {temperatureC}°"
+    },
+    "network": {
+        "format-wifi": "󰖩",
+        "format-ethernet": "󰈀",
+        "format-disconnected": "󰤭",
+        "format-linked": "󰈀",
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}/{cidr}",
+        "tooltip-format-ethernet": "{ifname}: {ipaddr}/{cidr}\nшлюз {gwaddr}",
+        "tooltip-format-disconnected": "Нет сети",
+        "on-click": "huilo-menu wifi",
+        "on-click-right": "nm-connection-editor"
+    },
+    "bluetooth": {
+        "format": "󰂯",
+        "format-connected": "󰂱",
+        "format-off": "󰂲",
+        "format-disabled": "󰂲",
+        "format-no-controller": "",
+        "tooltip-format": "Bluetooth: {status}",
+        "tooltip-format-connected": "{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}",
+        "on-click": "blueman-manager"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰝟",
+        "format-bluetooth": "󰂰 {volume}%",
+        "format-icons": {
+            "headphone": "󰋋",
+            "default": [
+                "󰕿",
+                "󰖀",
+                "󰕾"
+            ]
+        },
+        "scroll-step": 5,
+        "on-click": "pavucontrol",
+        "on-click-middle": "huilo-eq menu",
+        "on-click-right": "swayosd-client --output-volume mute-toggle",
+        "tooltip-format": "{desc}: {volume}%\nЛКМ — микшер, СКМ — эквалайзер, ПКМ — без звука"
+    },
+    "battery": {
+        "states": {
+            "warning": 25,
+            "critical": 10
+        },
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-plugged": "󰚥 {capacity}%",
+        "format-icons": [
+            "󰁺",
+            "󰁼",
+            "󰁾",
+            "󰂀",
+            "󰁹"
+        ],
+        "tooltip-format": "{timeTo}"
+    },
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": {
+            "activated": "󰅶",
+            "deactivated": "󰅶"
+        },
+        "tooltip-format-activated": "Экран не гаснет",
+        "tooltip-format-deactivated": "Экран гаснет как обычно"
+    },
+    "custom/notifications": {
+        "tooltip": false,
+        "format": "{icon}",
+        "return-type": "json",
+        "escape": true,
+        "format-icons": {
+            "notification": "󰂚",
+            "none": "󰂜",
+            "dnd-notification": "󰂛",
+            "dnd-none": "󰂛",
+            "inhibited-notification": "󰂚",
+            "inhibited-none": "󰂜",
+            "dnd-inhibited-notification": "󰂛",
+            "dnd-inhibited-none": "󰂛"
+        },
+        "exec-if": "which swaync-client",
+        "exec": "swaync-client -swb",
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "swaync-client -d -sw"
+    },
+    "tray": {
+        "spacing": 8,
+        "icon-size": 16
+    },
+    "custom/power": {
+        "format": "⏻",
+        "tooltip-format": "Питание",
+        "on-click": "huilo-menu power"
+    }
+}

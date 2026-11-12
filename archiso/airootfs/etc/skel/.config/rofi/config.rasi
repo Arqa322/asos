@@ -1,0 +1,21 @@
+/* rofi settings of Huilo. The look: /usr/share/rofi/themes/huilo*.rasi
+   (generated from theme/palette.toml). Put your own overrides below @theme. */
+configuration {
+    modes: "drun,run";
+    show-icons: true;
+    icon-theme: "Papirus-Dark";
+    terminal: "kitty";
+    drun-display-format: "{name}";
+    drun-match-fields: "name,generic,keywords,exec";
+    display-drun: "Приложения";
+    display-run: "Команды";
+    display-calc: "Калькулятор";
+    display-emoji: "Эмодзи";
+    matching: "fuzzy";
+    sort: true;
+    sorting-method: "fzf";
+    hover-select: true;
+    me-select-entry: "MouseSecondary";
+    me-accept-entry: "MousePrimary";
+}
+@theme "huilo"

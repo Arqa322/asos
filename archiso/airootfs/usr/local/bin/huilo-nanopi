@@ -1,0 +1,406 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-nanopi — FriendlyELEC NanoPi / ARM SBC toolkit for Huilo
+#
+#  Boards, network discovery, UART console, safe SD/eMMC image flashing with
+#  read-back verification, aarch64 chroot via qemu-user-static, sysroot for
+#  cross-compiling, sharing the PC's internet over an Ethernet cable,
+#  Rockchip maskrom (rkdeveloptool) and Allwinner FEL (xfel/sunxi-fel).
+# ============================================================================
+set -euo pipefail
+
+c_ok=$'\e[32m'; c_warn=$'\e[33m'; c_err=$'\e[31m'; c_b=$'\e[1m'; c_dim=$'\e[2m'; c_0=$'\e[0m'
+[[ -t 1 ]] || { c_ok=; c_warn=; c_err=; c_b=; c_dim=; c_0=; }
+die()  { echo "${c_err}error:${c_0} $*" >&2; exit 1; }
+info() { echo "${c_ok}::${c_0} $*"; }
+warn() { echo "${c_warn}!!${c_0} $*" >&2; }
+need() { command -v "$1" >/dev/null || die "'$1' не найден${2:+ ($2)}"; }
+as_root() { if [[ $EUID -eq 0 ]]; then "$@"; else sudo -- "$@"; fi; }
+
+SHARE_CON="huilo-nanopi-share"
+EMB=/usr/share/huilo/embedded
+
+# ---------------------------------------------------------------- boards ---
+# model | SoC | UART baud | notes
+BOARDS=$(cat <<'EOF'
+NanoPi NEO / NEO Air / Duo2|Allwinner H3 (armv7)|115200|FEL: xfel / sunxi-fel; загрузка с microSD
+NanoPi NEO2 / NEO Plus2|Allwinner H5 (aarch64)|115200|FEL: xfel / sunxi-fel; загрузка с microSD
+NanoPi NEO3 / R2S / R2C|Rockchip RK3328|1500000|maskrom: rkdeveloptool; FriendlyWrt/FriendlyCore
+NanoPi R4S / M4 / M4V2 / NEO4|Rockchip RK3399|1500000|maskrom: rkdeveloptool
+NanoPi R3S|Rockchip RK3566|1500000|maskrom: rkdeveloptool
+NanoPi R5S / R5C|Rockchip RK3568|1500000|eMMC; прошивка eMMC через образ eflasher
+NanoPi R6S / R6C / M6|Rockchip RK3588S|1500000|eMMC; прошивка eMMC через образ eflasher
+NanoPC-T6|Rockchip RK3588|1500000|eMMC; прошивка eMMC через образ eflasher
+EOF
+)
+
+cmd_boards() {
+	echo "${c_b}Популярные платы FriendlyELEC${c_0}"
+	# (printf pads by bytes, so the Cyrillic header is aligned by hand)
+	echo "${c_b}Модель                         SoC                      UART      Примечание${c_0}"
+	while IFS='|' read -r m soc baud note; do
+		printf '%-30s %-24s %-9s %s\n' "$m" "$soc" "$baud" "$note"
+	done <<<"$BOARDS"
+	cat <<EOF
+
+${c_b}Учётные записи по умолчанию${c_0} (смените после первого входа!)
+  FriendlyCore / FriendlyDesktop (Ubuntu/Debian):  pi / pi,  root / fa
+  FriendlyWrt (OpenWrt):                           root / password  (веб: http://<ip>)
+  Armbian:  root / 1234 (при первом входе попросит сменить);   DietPi: root / dietpi
+
+${c_b}Образы${c_0}:  https://wiki.friendlyelec.com  →  страница платы  →  Download Link
+  *-sd-*.img.gz        запуск с microSD
+  *-eflasher-*.img.gz  microSD-прошивальщик: загрузиться с неё → образ запишется в eMMC
+
+${c_b}UART${c_0}: адаптер 3.3 В (CP2102N, CH343, FT232). Rockchip работает на 1500000 бод —
+  дешёвые CH340G такую скорость часто не тянут. Соединение: GND–GND, TX–RX, RX–TX, питание не подключать.
+EOF
+}
+
+# ------------------------------------------------------------------ find ---
+cmd_find() {
+	local cidr found=0
+	info "поиск через mDNS (avahi)"
+	if command -v avahi-browse >/dev/null; then
+		avahi-browse -atrp 2>/dev/null | awk -F';' '$1=="=" && $3=="IPv4" {print $7"\t"$8}' | sort -u |
+			grep -i -E 'nanopi|nanopc|friendly|armbian|dietpi|openwrt|rock|orange|raspberry' && found=1 || true
+	fi
+	for h in nanopi.local friendlywrt.local friendlyelec.local nanopi-r2s.local nanopi-r4s.local nanopi-r5s.local nanopi-r6s.local NanoPi-R6S.local; do
+		ip=$(getent hosts "$h" 2>/dev/null | awk '{print $1}' | head -n1 || true)
+		[[ -n "$ip" ]] && { printf '%s\t%s\n' "$h" "$ip"; found=1; }
+	done
+	need nmap
+	local ifc addr pre
+	while read -r ifc addr; do
+		case "$ifc" in docker*|virbr*|br-*|veth*|tailscale*|wg*|tun*) continue ;; esac
+		pre=${addr#*/}; cidr=$addr
+		# never sweep huge networks: limit to the /24 around our address
+		if (( pre < 24 )); then cidr="${addr%.*/*}.0/24"; fi
+		info "сканирование SSH/HTTP в $cidr ($ifc, nmap)"
+		nmap -T4 --open -p 22,80 "$cidr" -oG - 2>/dev/null | awk '/Ports:/ {
+			ports = $0; sub(/.*Ports: /, "", ports); gsub(/\/\/[^,]*/, "", ports)
+			printf "  %-16s %-30s %s\n", $2, $3, ports }' || true
+	done < <(ip -o -4 addr show scope global | awk '{print $2, $4}')
+	echo
+	echo "${c_dim}Подсказка: FriendlyWrt раздаёт адреса 192.168.2.x на LAN-порту (роутер: 192.168.2.1);"
+	echo "при прямом подключении кабелем используйте: huilo-nanopi share <интерфейс>${c_0}"
+	[[ $found == 1 ]] || true
+}
+
+# --------------------------------------------------------------- console ---
+cmd_console() {
+	local dev=${1:-} baud=${2:-1500000}
+	if [[ -z "$dev" ]]; then
+		dev=$(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null | head -n1 || true)
+		[[ -n "$dev" ]] || die "USB-UART адаптер не найден (lsusb, dmesg | tail)"
+	fi
+	[[ -w "$dev" ]] || die "нет доступа к $dev — нужен вход в группу uucp (huilo-arduino doctor)"
+	info "консоль $dev @ $baud (выход: Ctrl+A Ctrl+X).  Allwinner: huilo-nanopi console $dev 115200"
+	if command -v tio >/dev/null; then exec tio -b "$baud" "$dev"; fi
+	need picocom
+	exec picocom -b "$baud" --noreset "$dev"
+}
+
+# ----------------------------------------------------------------- flash ---
+xcat() { # decompress any image format to stdout
+	case "$1" in
+		*.gz) if command -v pigz >/dev/null; then pigz -dc -- "$1"; else gzip -dc -- "$1"; fi ;;
+		*.xz) xz -T0 -dc -- "$1" ;;
+		*.zst|*.zstd) zstd -dc -- "$1" ;;
+		*.bz2) bzip2 -dc -- "$1" ;;
+		*.7z) 7z x -so -- "$1" ;;
+		*.zip)
+			local inner
+			inner=$(unzip -Z1 -- "$1" | grep -E '\.(img|raw)$' | head -n1 || true)
+			[[ -n "$inner" ]] || die "в $1 нет файла .img"
+			unzip -p -- "$1" "$inner" ;;
+		*) cat -- "$1" ;;
+	esac
+}
+
+system_disks() { # disks holding /, /boot, the live medium, swap
+	{
+		for m in / /boot /efi /run/archiso/bootmnt /home; do findmnt -no SOURCE "$m" 2>/dev/null || true; done
+		swapon --noheadings --raw --show=NAME 2>/dev/null || true
+	} | sed 's/\[.*\]$//' | while read -r src; do
+		[[ -b "$src" ]] || continue
+		lsblk -rnso NAME,TYPE "$src" 2>/dev/null | awk '$2=="disk"{print "/dev/"$1}'
+	done | sort -u
+}
+
+cmd_flash() {
+	local img="" dev="" force=0 verify=1
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--force) force=1 ;;
+			--no-verify) verify=0 ;;
+			*) if [[ -z "$img" ]]; then img=$1; elif [[ -z "$dev" ]]; then dev=$1; else die "лишний аргумент: $1"; fi ;;
+		esac
+		shift
+	done
+	[[ -n "$img" && -f "$img" ]] || die "usage: huilo-nanopi flash <image.img[.gz|.xz|.zst|.zip|.7z]> [/dev/sdX|/dev/mmcblkN] [--no-verify] [--force]"
+
+	if [[ -z "$dev" ]]; then
+		echo "${c_b}Съёмные носители:${c_0}"
+		lsblk -dpno NAME,SIZE,TRAN,RM,MODEL -e 7,11 | awk '$4==1 || $3=="usb" || $3=="mmc" || $1 ~ /mmcblk/' || true
+		read -rp "Устройство для записи (например /dev/sdb): " dev
+	fi
+	[[ -b "$dev" ]] || die "$dev не блочное устройство"
+	[[ "$(lsblk -dno TYPE "$dev")" =~ ^(disk|loop)$ ]] || die "$dev — раздел, нужен весь диск (например /dev/sdb, а не /dev/sdb1)"
+	if system_disks | grep -qx "$dev"; then die "$dev — системный диск или live-носитель, запись запрещена"; fi
+	local rm tran size model
+	rm=$(lsblk -dno RM "$dev" | xargs); tran=$(lsblk -dno TRAN "$dev" | xargs)
+	size=$(lsblk -dno SIZE "$dev" | xargs); model=$(lsblk -dno MODEL "$dev" | xargs)
+	if [[ "$rm" != 1 && "$tran" != usb && "$dev" != /dev/mmcblk* && $force == 0 ]]; then
+		die "$dev не похож на SD-карту/флешку (RM=$rm TRAN=$tran). Если уверены — добавьте --force"
+	fi
+
+	echo
+	echo "  образ:      $img ($(du -h "$img" | cut -f1))"
+	echo "  устройство: ${c_b}$dev${c_0}  $size  ${model:-} ($tran)"
+	lsblk -no NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS "$dev" | sed 's/^/              /'
+	echo "${c_err}ВСЕ ДАННЫЕ НА $dev БУДУТ УНИЧТОЖЕНЫ.${c_0}"
+	local answer; read -rp "Введите имя устройства ($(basename "$dev")) для подтверждения: " answer
+	[[ "$answer" == "$(basename "$dev")" || "$answer" == "$dev" ]] || die "отменено"
+
+	# unmount everything on the device
+	local p
+	for p in $(lsblk -lnpo NAME "$dev" | tail -n +2); do as_root umount "$p" 2>/dev/null || true; done
+
+	info "запись (pv показывает объём распакованных данных)"
+	xcat "$img" | pv -t -r -b -a | as_root dd of="$dev" bs=4M iflag=fullblock conv=fsync status=none
+	as_root sync
+
+	if [[ $verify == 1 ]]; then
+		info "проверка: сравнение образа с записанными данными"
+		local out
+		out=$( (xcat "$img" | as_root env LC_ALL=C cmp - "$dev") 2>&1 || true)
+		if grep -q 'EOF on -' <<<"$out"; then
+			info "${c_ok}проверка пройдена${c_0}"
+		elif [[ -z "$out" ]]; then
+			info "${c_ok}проверка пройдена${c_0} (образ совпадает с устройством целиком)"
+		else
+			die "проверка НЕ пройдена: $out"
+		fi
+	fi
+	as_root partprobe "$dev" 2>/dev/null || true
+	info "готово — можно извлекать карту: udisksctl power-off -b $dev"
+}
+
+# ---------------------------------------------------------------- chroot ---
+binfmt_ok() { [[ -e /proc/sys/fs/binfmt_misc/qemu-aarch64 || -e /proc/sys/fs/binfmt_misc/qemu-arm ]]; }
+
+pick_root_part() { # $1 = disk or loop device -> rootfs partition
+	local dev=$1 part
+	part=$(lsblk -lnpo NAME,PARTLABEL,LABEL "$dev" | awk 'tolower($2)=="rootfs" || tolower($3)=="rootfs" {print $1; exit}')
+	if [[ -z "$part" ]]; then
+		part=$(lsblk -lnpbo NAME,FSTYPE,SIZE "$dev" | awk '$2 ~ /^(ext4|btrfs|f2fs|xfs)$/ {print $3, $1}' | sort -n | tail -n1 | cut -d' ' -f2)
+	fi
+	printf '%s' "$part"
+}
+
+cmd_chroot() {
+	local target=${1:-} mnt loop="" root part
+	[[ -n "$target" ]] || die "usage: huilo-nanopi chroot <image.img | /dev/sdX | каталог-rootfs>"
+	need arch-chroot "arch-install-scripts"
+	binfmt_ok || { as_root systemctl restart systemd-binfmt.service || true; binfmt_ok || die "binfmt для aarch64/arm не активен (qemu-user-static-binfmt)"; }
+
+	mnt=$(mktemp -d /tmp/huilo-chroot.XXXXXX)
+	cleanup_chroot() {
+		as_root umount -R "$mnt" 2>/dev/null || true
+		[[ -n "$loop" ]] && as_root losetup -d "$loop" 2>/dev/null || true
+		rmdir "$mnt" 2>/dev/null || true
+	}
+	trap cleanup_chroot EXIT
+
+	if [[ -d "$target" ]]; then
+		root=$target
+	else
+		if [[ -f "$target" ]]; then
+			case "$target" in *.gz|*.xz|*.zst|*.zip|*.7z|*.bz2) die "сначала распакуйте образ (например: unxz -k $target)";; esac
+			loop=$(as_root losetup -fP --show "$target")
+			as_root udevadm settle || true
+			part=$(pick_root_part "$loop")
+		elif [[ -b "$target" ]]; then
+			part=$(pick_root_part "$target")
+		else
+			die "$target не найден"
+		fi
+		[[ -n "$part" ]] || die "не найден раздел rootfs в $target"
+		info "монтирую $part"
+		as_root mount "$part" "$mnt"
+		root=$mnt
+	fi
+	[[ -x "$root/bin/sh" || -L "$root/bin/sh" ]] || die "$root не похож на корневую ФС Linux"
+	info "chroot в $root ($(file -bL "$root/bin/sh" 2>/dev/null | cut -d, -f2 | xargs)). Выход: exit"
+	as_root arch-chroot "$root" /bin/sh -c 'if [ -x /bin/bash ]; then exec /bin/bash -i; else exec /bin/sh -i; fi'
+}
+
+# --------------------------------------------------------------- sysroot ---
+cmd_sysroot() {
+	local host=${1:-} dir=${2:-$HOME/sysroots/nanopi}
+	[[ -n "$host" ]] || die "usage: huilo-nanopi sysroot <user@host> [каталог]   (по умолчанию ~/sysroots/nanopi)"
+	need rsync
+	mkdir -p "$dir"
+	info "копирую /lib /usr/include /usr/lib с $host в $dir (на плате нужен rsync)"
+	rsync -aR --info=progress2 --delete --rsync-path="sudo rsync" \
+		"$host":/lib "$host":/usr/include "$host":/usr/lib "$host":/usr/local/include "$host":/usr/local/lib "$dir"/ 2>/dev/null ||
+		rsync -aR --info=progress2 --delete "$host":/lib "$host":/usr/include "$host":/usr/lib "$dir"/
+	info "исправляю абсолютные симлинки"
+	local l t
+	while IFS= read -r -d '' l; do
+		t=$(readlink "$l")
+		[[ "$t" == /* ]] || continue
+		ln -sfn "$(realpath -m --relative-to="$(dirname "$l")" "$dir$t")" "$l"
+	done < <(find "$dir" -type l -print0)
+	info "готово. Кросс-сборка с этим sysroot:"
+	echo "  export HUILO_SYSROOT=$dir"
+	echo "  cmake -B build -DCMAKE_TOOLCHAIN_FILE=$EMB/aarch64-linux-gnu.cmake"
+	echo "  meson setup build --cross-file $EMB/aarch64-linux-gnu.meson"
+}
+
+cmd_cross() {
+	cat <<EOF
+${c_b}Кросс-компиляция для NanoPi (aarch64)${c_0}
+  Компиляторы:  aarch64-linux-gnu-gcc / -g++ / -gdb   (qemu-aarch64-static запускает результат на ПК)
+
+  Быстро:   aarch64-linux-gnu-gcc -O2 -o hello hello.c && qemu-aarch64-static -L /usr/aarch64-linux-gnu ./hello
+  CMake:    cmake -B build -DCMAKE_TOOLCHAIN_FILE=$EMB/aarch64-linux-gnu.cmake && cmake --build build
+  Meson:    meson setup build --cross-file $EMB/aarch64-linux-gnu.meson && ninja -C build
+  Пример:   cp -r $EMB/examples/nanopi-hello ~/ && cd ~/nanopi-hello && ./deploy.sh pi@nanopi.local
+
+  Библиотеки платы (libgpiod, openssl ...): huilo-nanopi sysroot pi@<ip>  и  export HUILO_SYSROOT=~/sysroots/nanopi
+  32-битные платы (NanoPi NEO/H3) — собирайте на самой плате или в chroot: huilo-nanopi chroot <образ>
+EOF
+}
+
+# ----------------------------------------------------------------- share ---
+cmd_share() {
+	local ifc=${1:-}
+	need nmcli
+	if [[ "$ifc" == off ]]; then
+		nmcli connection down "$SHARE_CON" 2>/dev/null || true
+		nmcli connection delete "$SHARE_CON" 2>/dev/null || true
+		info "раздача интернета выключена"; return 0
+	fi
+	if [[ -z "$ifc" ]]; then
+		echo "${c_b}Ethernet-интерфейсы:${c_0}"; nmcli -t -f DEVICE,TYPE,STATE device | awk -F: '$2=="ethernet"{print "  "$1"  ("$3")"}'
+		read -rp "Интерфейс, к которому подключена плата: " ifc
+	fi
+	nmcli -t -f DEVICE device | grep -qx "$ifc" || die "интерфейс $ifc не найден"
+	nmcli connection delete "$SHARE_CON" >/dev/null 2>&1 || true
+	nmcli connection add type ethernet ifname "$ifc" con-name "$SHARE_CON" \
+		ipv4.method shared ipv4.addresses 10.42.0.1/24 ipv6.method ignore autoconnect no >/dev/null
+	nmcli connection up "$SHARE_CON" >/dev/null
+	info "интернет раздаётся на $ifc: ПК = 10.42.0.1, плата получит адрес 10.42.0.x по DHCP"
+	info "через ~30 с найдите плату: nmap -sn 10.42.0.0/24   или   ip neigh show dev $ifc"
+	echo "${c_dim}Трафик платы тоже идёт через zapret ПК.  Выключить: huilo-nanopi share off${c_0}"
+}
+
+# --------------------------------------------------------- maskrom / FEL ---
+cmd_usb() {
+	echo "${c_b}USB-устройства в режимах прошивки${c_0}"
+	local any=0
+	if lsusb -d 2207: 2>/dev/null | grep -q .; then
+		any=1; lsusb -d 2207: | sed 's/^/  Rockchip: /'
+		if command -v rkdeveloptool >/dev/null; then rkdeveloptool ld || true; fi
+		cat <<EOF
+  Прошивка eMMC в режиме maskrom (нужен загрузчик MiniLoaderAll.bin для вашего SoC — из пакета
+  образа FriendlyELEC или https://github.com/rockchip-linux/rkbin):
+    rkdeveloptool db MiniLoaderAll.bin
+    rkdeveloptool wl 0 образ.img        # распакованный *-sd-*.img или *.raw
+    rkdeveloptool rd
+EOF
+	fi
+	if lsusb -d 1f3a:efe8 2>/dev/null | grep -q .; then
+		any=1; lsusb -d 1f3a:efe8 | sed 's/^/  Allwinner FEL: /'
+		if command -v xfel >/dev/null; then xfel version || true; elif command -v sunxi-fel >/dev/null; then sunxi-fel ver || true; fi
+	fi
+	if [[ $any == 0 ]]; then
+		cat <<EOF
+  не найдено.
+  Rockchip (R2S/R4S/R5S/R6S/M4/M6/T6): отключите питание, зажмите кнопку MASK (или замкните
+    контакты eMMC CLK на GND на старых платах), подключите USB-C/OTG к ПК, отпустите через 3 с.
+  Allwinner (NEO/NEO2): без microSD в слоте плата с пустой памятью сама уходит в FEL при подключении по OTG.
+EOF
+	fi
+}
+
+cmd_ssh() {
+	local host=${1:?usage: huilo-nanopi ssh <user@host>}
+	[[ -f ~/.ssh/id_ed25519 ]] || { info "создаю SSH-ключ ~/.ssh/id_ed25519"; ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -q; }
+	info "копирую ключ на $host (потребуется пароль платы один раз)"
+	ssh-copy-id -o StrictHostKeyChecking=accept-new "$host"
+	info "готово: ssh $host"
+}
+
+cmd_menu() {
+	command -v dialog >/dev/null || die "dialog is not installed"
+	local c v
+	while true; do
+		c=$(dialog --stdout --title "Huilo NanoPi" --menu "FriendlyELEC NanoPi / ARM-платы" 20 74 12 \
+			boards "Список плат, скорости UART, пароли по умолчанию" \
+			find "Найти плату в сети" \
+			console "UART-консоль" \
+			flash "Записать образ на microSD / USB" \
+			share "Раздать интернет плате по кабелю" \
+			ssh "Настроить вход по SSH-ключу" \
+			usb "Maskrom (Rockchip) / FEL (Allwinner)" \
+			chroot "Chroot в образ / rootfs (aarch64 через qemu)" \
+			cross "Кросс-компиляция: справка" \
+			quit "Выход") || break
+		clear
+		case "$c" in
+			boards) cmd_boards | less -R ;;
+			find) cmd_find || true; read -rp "Enter..." _ ;;
+			console)
+				v=$(dialog --stdout --menu "Скорость UART" 10 50 3 1500000 "Rockchip (R2S…R6S, M4, T6)" 115200 "Allwinner (NEO, NEO2)") &&
+					(cmd_console "" "$v") || true ;;
+			flash)
+				v=$(dialog --stdout --fselect "$(xdg-user-dir DOWNLOAD 2>/dev/null || echo "$HOME")/" 14 70) && [[ -f "$v" ]] && { (cmd_flash "$v") || true; read -rp "Enter..." _; } ;;
+			share) (cmd_share) || true; read -rp "Enter..." _ ;;
+			ssh) v=$(dialog --stdout --inputbox "user@host" 8 50 "pi@") && { (cmd_ssh "$v") || true; read -rp "Enter..." _; } ;;
+			usb) cmd_usb || true; read -rp "Enter..." _ ;;
+			chroot) v=$(dialog --stdout --fselect "$HOME/" 14 70) && { (cmd_chroot "$v") || true; } ;;
+			cross) cmd_cross | less -R ;;
+			quit) break ;;
+		esac
+	done
+	clear
+}
+
+usage() {
+	cat <<EOF
+${c_b}huilo-nanopi${c_0} — FriendlyELEC NanoPi / ARM SBC toolkit
+
+  menu                              интерактивное меню
+  boards                            платы, SoC, скорость UART, пароли по умолчанию
+  find                              найти плату в сети (mDNS + nmap)
+  console [dev] [baud]              UART-консоль (по умолчанию 1500000 — Rockchip)
+  flash <img> [dev] [--no-verify]   записать образ (.img/.gz/.xz/.zst/.zip/.7z) на SD/USB
+                                    с проверкой чтением; системный диск защищён
+  share <ifname> | off              раздать интернет плате по Ethernet (10.42.0.0/24)
+  ssh <user@host>                   создать ключ и настроить вход без пароля
+  usb                               maskrom (Rockchip) / FEL (Allwinner) устройства
+  chroot <img|dev|dir>              chroot в aarch64/armhf rootfs через qemu-user-static
+  sysroot <user@host> [dir]         скопировать библиотеки платы для кросс-сборки
+  cross                             справка по кросс-компиляции
+EOF
+}
+
+cmd=${1:-menu}; shift || true
+case "$cmd" in
+	menu) cmd_menu ;;
+	boards) cmd_boards ;;
+	find|scan) cmd_find ;;
+	console|uart|serial) cmd_console "$@" ;;
+	flash|write) cmd_flash "$@" ;;
+	share) cmd_share "$@" ;;
+	ssh) cmd_ssh "$@" ;;
+	usb|maskrom|fel) cmd_usb ;;
+	chroot) cmd_chroot "$@" ;;
+	sysroot) cmd_sysroot "$@" ;;
+	cross) cmd_cross ;;
+	-h|--help|help) usage ;;
+	*) usage; exit 1 ;;
+esac

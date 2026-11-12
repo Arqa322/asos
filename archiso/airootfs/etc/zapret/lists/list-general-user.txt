@@ -1,0 +1,3 @@
+# Your own domains to unblock (one per line). Merged with Flowseal list-general.txt.
+# Example:
+# example.com

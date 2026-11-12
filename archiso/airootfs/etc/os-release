@@ -1,0 +1,13 @@
+NAME="Huilo"
+PRETTY_NAME="Huilo (Arch Linux + Hyprland)"
+ID=arch
+ID_LIKE=arch
+BUILD_ID=rolling
+VARIANT="Hyprland"
+VARIANT_ID=huilo
+ANSI_COLOR="38;2;137;180;250"
+HOME_URL="https://github.com/Arqa322/Huilo"
+DOCUMENTATION_URL="https://wiki.archlinux.org/"
+SUPPORT_URL="https://bbs.archlinux.org/"
+BUG_REPORT_URL="https://github.com/Arqa322/Huilo/issues"
+LOGO=archlinux-logo

@@ -1,0 +1,82 @@
+# ============================================================
+#  Atom game pack — hostlist (merged into zapret user hostlist)
+#  Launchers, stores, game services, mod hubs, streaming.
+# ============================================================
+# --- Steam / Valve ---
+steampowered.com
+steamcommunity.com
+steamstatic.com
+steamcontent.com
+steamserver.net
+steamusercontent.com
+steamgames.com
+steam-chat.com
+steamcdn-a.akamaihd.net
+valvesoftware.com
+dota2.com
+counter-strike.net
+# --- Epic Games ---
+epicgames.com
+epicgames.dev
+unrealengine.com
+fortnite.com
+# --- EA / Ubisoft / Rockstar ---
+ea.com
+origin.com
+ubisoft.com
+ubi.com
+ubisoftconnect.com
+rockstargames.com
+socialclub.rockstargames.com
+# --- Blizzard / Battle.net ---
+battle.net
+blizzard.com
+blz-contentstack.com
+# --- Riot Games ---
+riotgames.com
+riotcdn.net
+leagueoflegends.com
+playvalorant.com
+# --- Roblox ---
+roblox.com
+rbxcdn.com
+rbx.com
+robloxlabs.com
+# --- Minecraft ---
+minecraft.net
+mojang.com
+minecraftservices.com
+# --- Consoles / platforms ---
+xboxlive.com
+xbox.com
+playstation.com
+playstation.net
+nintendo.com
+gog.com
+gog-statics.com
+# --- Competitive / anti-cheat ---
+faceit.com
+faceit-cdn.net
+battleye.com
+easy.ac
+# --- Other popular titles ---
+hoyoverse.com
+mihoyo.com
+supercell.com
+escapefromtarkov.com
+battlestate.games
+warframe.com
+pubg.com
+krafton.com
+# --- Mods / tools ---
+nexusmods.com
+curseforge.com
+forgecdn.net
+modrinth.com
+protondb.com
+lutris.net
+# --- Streaming ---
+twitch.tv
+ttvnw.net
+jtvnw.net
+kick.com

@@ -1,0 +1,24 @@
+/* Huilo accents for GTK 3 apps (theme adw-gtk3-dark). Colours: theme/palette.toml */
+@define-color accent_color @{honey};
+@define-color accent_bg_color @{amber};
+@define-color accent_fg_color @{ink0};
+@define-color window_bg_color @{ink1};
+@define-color window_fg_color @{snow};
+@define-color view_bg_color @{ink1};
+@define-color view_fg_color @{snow};
+@define-color headerbar_bg_color @{ink2};
+@define-color headerbar_fg_color @{snow};
+@define-color headerbar_backdrop_color @{ink1};
+@define-color headerbar_border_color @{ink4};
+@define-color sidebar_bg_color @{ink2};
+@define-color sidebar_fg_color @{snow};
+@define-color card_bg_color rgba(@{snow.rgb}, 0.04);
+@define-color card_fg_color @{snow};
+@define-color popover_bg_color @{ink2};
+@define-color popover_fg_color @{snow};
+@define-color dialog_bg_color @{ink2};
+@define-color dialog_fg_color @{snow};
+@define-color destructive_bg_color @{berry};
+@define-color success_color @{pine};
+@define-color warning_color @{honey};
+@define-color error_color @{berry};

@@ -1,0 +1,255 @@
+name: Build Huilo ISO
+
+on:
+  push:
+    branches: ["claude/**", "main"]
+    paths: ["archiso/**", "scripts/**", "theme/**", "vm/**", "build.sh", ".github/workflows/**"]
+    tags: ["v*"]
+  pull_request:
+    paths: ["archiso/**", "scripts/**", "theme/**", "vm/**", "build.sh", ".github/workflows/**"]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish as a GitHub release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  # Fast sanity check (~1 min): every package exists, dependencies resolve,
+  # no package/file conflicts, AUR packages build from official deps.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Shell syntax
+        run: |
+          for f in build.sh scripts/*.sh vm/*.sh archiso/airootfs/usr/local/bin/*; do bash -n "$f"; done
+      - name: PowerShell syntax
+        shell: pwsh
+        run: |
+          $t = $null; $e = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD/vm/create-vm.ps1", [ref]$t, [ref]$e)
+          if ($e.Count) { $e | ForEach-Object { Write-Error ("{0}:{1} {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message) }; exit 1 }
+      - name: Executables keep their mode in the ISO (file_permissions)
+        run: scripts/check-permissions.sh
+      - name: Theme files are generated from theme/palette.toml
+        run: |
+          python3 scripts/make-theme.py --check
+          if grep -rIl --exclude-dir=Arduino '@{[a-z][a-z0-9_]*\(\.[a-z]*\)\?}' archiso/; then echo "::error::unrendered theme placeholders"; exit 1; fi
+      - name: AI assistant (huilo-ai) against a mock model server
+        run: scripts/tests/test-huilo-ai.sh
+      - name: Optional package groups
+        run: |
+          full=$(scripts/pkg-select.sh archiso/packages.x86_64 | wc -l)
+          raw=$(grep -v '^#' archiso/packages.x86_64 | sed 's/#.*//;s/[[:space:]]//g' | grep -v '^$' | sort -u | wc -l)
+          min=$(scripts/pkg-select.sh archiso/packages.x86_64 --without minimal | wc -l)
+          echo "all=$full raw=$raw minimal=$min"
+          [ "$full" -eq "$raw" ] && [ "$min" -lt "$full" ] && [ "$min" -gt 100 ]
+          for g in $(scripts/pkg-select.sh --resolve minimal); do
+            n=$(scripts/pkg-select.sh archiso/packages.x86_64 --only "$g" | wc -l); echo "  $g: $n"
+          done
+          if scripts/pkg-select.sh archiso/packages.x86_64 --without nosuchgroup >/dev/null 2>&1; then echo "::error::unknown group accepted"; exit 1; fi
+      - name: Validate package lists against Arch repositories
+        run: python3 scripts/check-packages.py
+      - name: Validate hyprland.lua against the Hyprland version in Arch
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.4
+          python3 scripts/check-hyprland-config.py --lua lua5.4
+      - name: The config checker must reject a broken config
+        run: |
+          rc=0
+          python3 scripts/check-hyprland-config.py --lua lua5.4 --config scripts/tests/hyprland-bad.lua >bad.txt 2>&1 || rc=$?
+          cat bad.txt
+          if [ "$rc" -eq 0 ]; then echo "::error::check-hyprland-config.py accepted a broken config"; exit 1; fi
+          for want in "unknown option general.gaps_inn" "decoration.rounding expects Int" "cursor.no_hardware_cursors expects Int" "unknown option misc.vfr" "unknown option input.touchpad.tap-to-click" "unknown event" "closee"; do
+            grep -q "$want" bad.txt || { echo "::error::checker missed: $want"; exit 1; }
+          done
+
+  # Desktop configs checked by the real programs from the Arch repositories
+  desktop-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: archlinux/archlinux:latest
+    steps:
+      - name: Install Hyprland, fastfetch, starship, sway, rofi, waybar, swaync, swayosd, kitty
+        run: |
+          pacman -Syu --noconfirm --needed git hyprland fastfetch starship sway mesa ttf-jetbrains-mono-nerd plymouth jq \
+            rofi waybar swaync swayosd kitty dialog gum dbus util-linux inter-font papirus-icon-theme adw-gtk-theme
+      - uses: actions/checkout@v5
+      - name: Prepare a test home with the Huilo skel
+        run: |
+          useradd -m tester
+          cp -a archiso/airootfs/etc/skel/. /home/tester/
+          cp -a archiso/airootfs/usr/share/huilo /usr/share/
+          cp -a archiso/airootfs/usr/share/rofi/themes/. /usr/share/rofi/themes/
+          chown -R tester:tester /home/tester
+          install -d -m 0700 -o tester /tmp/xdg
+      - name: Hyprland --verify-config (hyprland.lua)
+        run: |
+          out=$(su tester -c 'export XDG_RUNTIME_DIR=/tmp/xdg HYPRLAND_HEADLESS_ONLY=1; Hyprland --verify-config -c ~/.config/hypr/hyprland.lua' 2>&1) && rc=0 || rc=$?
+          echo "$out" | tail -n 40
+          echo "exit code: $rc"
+          if [ "$rc" -ne 0 ] || echo "$out" | grep -q -i -E 'config error|error in|errors in'; then echo "::error::Hyprland rejected hyprland.lua"; exit 1; fi
+      - name: fastfetch with the Huilo config
+        run: |
+          out=$(su tester -c 'fastfetch --pipe true 2>&1')
+          echo "$out"
+          if echo "$out" | grep -q -i -E 'error|unknown|invalid'; then echo "::error::fastfetch reported a config problem"; exit 1; fi
+          echo "$out" | grep -q '▟███▛' || { echo "::error::Huilo logo missing"; exit 1; }
+      - name: starship prompt with the Huilo config
+        run: |
+          out=$(su tester -c 'cd ~ && starship print-config >/dev/null && starship prompt --status 0' 2>&1)
+          echo "$out"
+          if echo "$out" | grep -q -E 'WARN|ERROR'; then echo "::error::starship reported a config problem"; exit 1; fi
+      - name: Plymouth theme is recognised
+        run: |
+          cp -a archiso/airootfs/usr/share/plymouth/themes/huilo /usr/share/plymouth/themes/
+          plymouth-set-default-theme -l | tee themes.txt
+          grep -qx huilo themes.txt
+          for f in splash.png background.png bar.png huilo.script; do test -s /usr/share/plymouth/themes/huilo/$f; done
+      - name: EasyEffects presets are valid JSON with known plugin names
+        run: |
+          for f in archiso/airootfs/etc/skel/.local/share/easyeffects/output/*.json; do
+            jq -e '.output.plugins_order == ["equalizer#0"] and (.output["equalizer#0"].left | length) == .output["equalizer#0"]["num-bands"]' "$f" >/dev/null \
+              || { echo "::error::bad preset $f"; exit 1; }
+          done
+      - name: rofi reads the Huilo themes and settings
+        run: |
+          for t in huilo huilo-list huilo-power huilo-grid; do
+            out=$(su tester -c "rofi -theme $t -dump-theme" 2>&1) || { echo "$out"; echo "::error::rofi failed on $t"; exit 1; }
+            if echo "$out" | grep -q -i -E 'failed to parse|rofi-warning|rofi-critical'; then echo "$out" | head -20; echo "::error::rofi theme $t"; exit 1; fi
+            echo "$out" | grep -q 'imagebox\|listview' || { echo "::error::rofi theme $t looks empty"; exit 1; }
+            echo "ok: $t"
+          done
+          cfg=$(su tester -c 'rofi -dump-config' 2>&1)
+          echo "$cfg" | grep -q 'icon-theme: "Papirus-Dark"' || { echo "$cfg" | head -40; echo "::error::rofi ignored ~/.config/rofi/config.rasi"; exit 1; }
+      - name: kitty accepts kitty.conf + colors.conf
+        run: |
+          out=$(su tester -c 'kitty +runpy "from kitty.config import load_config; load_config(\"/home/tester/.config/kitty/kitty.conf\")"' 2>&1) || true
+          echo "$out"
+          if echo "$out" | grep -q -i -E 'unknown|invalid|ignoring|error'; then echo "::error::kitty config problem"; exit 1; fi
+      - name: dialog accepts the Huilo colours (dialogrc)
+        run: |
+          out=$(TERM=xterm timeout 5 script -q -e -c 'DIALOGRC=archiso/airootfs/usr/share/huilo/theme/dialogrc dialog --infobox test 3 20' /dev/null 2>&1) || true
+          if echo "$out" | grep -q -E 'unknown variable|syntax error|expected|Parse error'; then echo "$out"; echo "::error::dialogrc"; exit 1; fi
+          echo ok
+      - name: waybar, swaync and swayosd start with the Huilo styles (headless sway)
+        run: |
+          cp "$(command -v sway)" /usr/local/bin/sway-headless
+          printf 'output HEADLESS-1 resolution 1920x1080\n' >/tmp/test-sway.conf
+          # swayosd talks to logind/upower over the system bus
+          mkdir -p /run/dbus && dbus-daemon --system --fork || true
+          su tester -c 'export XDG_RUNTIME_DIR=/tmp/xdg WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1; dbus-run-session -- sh -c "
+            sway-headless -c /tmp/test-sway.conf >/tmp/sway.log 2>&1 &
+            SWAY=\$!
+            for i in \$(seq 1 50); do [ -S /tmp/xdg/wayland-1 ] && break; sleep 0.2; done
+            export WAYLAND_DISPLAY=wayland-1 GSK_RENDERER=cairo
+            timeout 8 waybar -c /usr/share/huilo/sway/waybar.jsonc -s ~/.config/waybar/style.css >/tmp/waybar.log 2>&1
+            timeout 6 swaync -c ~/.config/swaync/config.json -s ~/.config/swaync/style.css >/tmp/swaync.log 2>&1
+            timeout 5 swayosd-server >/tmp/swayosd.log 2>&1
+            kill \$SWAY; wait \$SWAY
+            true"' || true
+          pkill -x sway-headless || true
+          bad=0
+          for f in waybar swaync swayosd; do
+            echo "::group::$f"; cat /tmp/$f.log; echo "::endgroup::"
+            if grep -q -i -E '\.css:[0-9]|theme parser error|is not a valid|not a valid property|unknown module|error parsing|parse error|invalid config|unknown property' /tmp/$f.log; then
+              echo "::error::$f reported a config/style problem"; bad=1
+            fi
+          done
+          grep -q -i 'wayland' /tmp/sway.log || cat /tmp/sway.log
+          exit $bad
+      - name: sway --validate (safe graphics mode)
+        # the packaged binary carries file capabilities, which an unprivileged
+        # container refuses to exec; a plain copy is enough to parse the config
+        run: |
+          cp "$(command -v sway)" /usr/local/bin/sway-nocap
+          su tester -c 'XDG_RUNTIME_DIR=/tmp/xdg WLR_BACKENDS=headless WLR_RENDERER=pixman sway-nocap --validate -c /usr/share/huilo/sway/config'
+
+  build:
+    needs: check
+    # the ISO is built only on demand (Run workflow) or for a release tag
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Free disk space and pick the biggest disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force
+          df -h / /mnt || true
+          # the build needs ~40 GB: use /mnt (the runner's temporary disk) when it has more room
+          base=$GITHUB_WORKSPACE/.build
+          if [ -d /mnt ] && [ "$(df -P -BG /mnt | awk 'NR==2 {gsub("G","",$4); print $4}')" -gt "$(df -P -BG / | awk 'NR==2 {gsub("G","",$4); print $4}')" ]; then
+            base=/mnt/huilo
+          fi
+          sudo mkdir -p "$base/work" "$base/out" "$base/pkg" && sudo chown -R "$(id -u):$(id -g)" "$base"
+          echo "HUILO_BASE=$base" >>"$GITHUB_ENV"
+          df -h "$base"
+
+      - name: Build ISO in Arch Linux container
+        run: WORK_DIR=$HUILO_BASE/work OUT_DIR=$HUILO_BASE/out PKG_CACHE=$HUILO_BASE/pkg ./build.sh --docker
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: huilo-iso
+          path: |
+            ${{ env.HUILO_BASE }}/out/*.iso
+            ${{ env.HUILO_BASE }}/out/*.sha256
+          compression-level: 0
+          retention-days: 7
+
+      - name: Boot test in QEMU (UEFI + serial journal, screenshots)
+        id: boot
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 ovmf xorriso socat python3-pil >/dev/null
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm || true
+          sudo rm -rf "$HUILO_BASE/work"   # room for the test
+          scripts/tests/boot-iso.sh "$(ls "$HUILO_BASE"/out/*.iso | head -n1)" boot-test 300
+
+      - name: Upload boot test (screenshots, journal)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-test
+          path: boot-test/
+          retention-days: 14
+
+      - name: Boot test result
+        if: steps.boot.outcome == 'failure'
+        run: |
+          echo "::error::the ISO did not reach the graphical session in QEMU — see the boot-test artifact"
+          exit 1
+
+      # GitHub release assets are limited to 2 GiB per file -> split the ISO
+      - name: Split ISO for release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
+        run: |
+          cd "$HUILO_BASE/out"
+          sudo chown -R "$(id -u):$(id -g)" .
+          for iso in *.iso; do split -b 1900M -d -a 2 "$iso" "$iso.part"; done
+          ls -lh
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
+          name: Huilo ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build {0}', github.run_number) }}
+          body: |
+            Собрать ISO из частей:
+            - Linux/macOS: `f=$(ls huilo-*.iso.sha256); iso=${f%.sha256}; cat "$iso".part* > "$iso" && sha256sum -c "$f"`
+            - Windows (cmd): `copy /b huilo-ВЕРСИЯ-x86_64.iso.part00 + huilo-ВЕРСИЯ-x86_64.iso.part01 + ... huilo-ВЕРСИЯ-x86_64.iso`
+          files: |
+            ${{ env.HUILO_BASE }}/out/*.iso.part*
+            ${{ env.HUILO_BASE }}/out/*.sha256

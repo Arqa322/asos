@@ -1,0 +1,27 @@
+/* generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy) */
+/* Huilo power menu: one row of big tiles */
+@import "huilo"
+
+window   { width: 640px; border-radius: 24px; }
+mainbox  { orientation: vertical; children: [ "listbox" ]; }
+listbox  { padding: 22px; spacing: 16px; children: [ "textbox-title", "listview" ]; }
+textbox-title {
+    expand: false;
+    content: "Завершение работы";
+    font: "Inter SemiBold 13";
+    text-color: @fog;
+    horizontal-align: 0.5;
+}
+listview { columns: 5; lines: 1; spacing: 12px; layout: vertical; fixed-columns: true; }
+element  {
+    orientation: vertical;
+    padding: 22px 6px 16px 6px;
+    spacing: 10px;
+    border-radius: 18px;
+    background-color: @ink2;
+    children: [ "element-icon", "element-text" ];
+}
+element-icon { size: 46px; horizontal-align: 0.5; }
+element-text { horizontal-align: 0.5; font: "Inter 10"; }
+element normal.normal, element alternate.normal { background-color: @ink2; }
+element selected.normal { background-color: @amber; text-color: @ink0; }

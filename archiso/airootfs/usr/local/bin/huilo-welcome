@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Greeting notification shown at Hyprland start
+sleep 2
+if grep -q archisobasedir /proc/cmdline; then
+	notify-send -a Huilo -i distributor-logo-archlinux -t 15000 "Добро пожаловать в Huilo (live)" \
+"Пользователь: huilo / пароль: huilo
+SUPER+Space — меню Huilo, SUPER+D — приложения
+SUPER+I — ИИ-помощник, SUPER+Z — zapret
+SUPER+Enter — терминал, SUPER+F1 — горячие клавиши
+SUPER+A — Arduino IDE, SUPER+Shift+N — NanoPi
+Установка на диск: sudo huilo-install"
+else
+	[[ -f ~/.cache/huilo-welcome-shown ]] && exit 0
+	mkdir -p ~/.cache && touch ~/.cache/huilo-welcome-shown
+	notify-send -a Huilo -i distributor-logo-archlinux -t 15000 "Добро пожаловать в Huilo" \
+"SUPER+Space — меню Huilo, SUPER+D — приложения
+SUPER+I — ИИ-помощник, SUPER+F1 — горячие клавиши"
+fi

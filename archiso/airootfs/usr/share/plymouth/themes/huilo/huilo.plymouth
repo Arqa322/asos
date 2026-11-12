@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Huilo
+Description=Huilo boot splash: the project photo with a progress bar
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/huilo
+ScriptFile=/usr/share/plymouth/themes/huilo/huilo.script

@@ -1,0 +1,48 @@
+/* Huilo accents for GTK 4 / libadwaita apps. Colours: theme/palette.toml */
+@define-color accent_color @{honey};
+@define-color accent_bg_color @{amber};
+@define-color accent_fg_color @{ink0};
+@define-color window_bg_color @{ink1};
+@define-color window_fg_color @{snow};
+@define-color view_bg_color @{ink1};
+@define-color view_fg_color @{snow};
+@define-color headerbar_bg_color @{ink2};
+@define-color headerbar_fg_color @{snow};
+@define-color headerbar_backdrop_color @{ink1};
+@define-color headerbar_border_color @{ink4};
+@define-color sidebar_bg_color @{ink2};
+@define-color sidebar_fg_color @{snow};
+@define-color card_bg_color rgba(@{snow.rgb}, 0.04);
+@define-color card_fg_color @{snow};
+@define-color popover_bg_color @{ink2};
+@define-color popover_fg_color @{snow};
+@define-color dialog_bg_color @{ink2};
+@define-color dialog_fg_color @{snow};
+@define-color destructive_bg_color @{berry};
+@define-color success_color @{pine};
+@define-color warning_color @{honey};
+@define-color error_color @{berry};
+
+/* libadwaita 1.6+ reads CSS variables */
+:root {
+  --accent-color: @{honey};
+  --accent-bg-color: @{amber};
+  --accent-fg-color: @{ink0};
+  --window-bg-color: @{ink1};
+  --window-fg-color: @{snow};
+  --view-bg-color: @{ink1};
+  --view-fg-color: @{snow};
+  --headerbar-bg-color: @{ink2};
+  --headerbar-fg-color: @{snow};
+  --sidebar-bg-color: @{ink2};
+  --sidebar-fg-color: @{snow};
+  --popover-bg-color: @{ink2};
+  --popover-fg-color: @{snow};
+  --dialog-bg-color: @{ink2};
+  --dialog-fg-color: @{snow};
+  --card-bg-color: rgba(@{snow.rgb}, 0.04);
+  --destructive-bg-color: @{berry};
+  --success-color: @{pine};
+  --warning-color: @{honey};
+  --error-color: @{berry};
+}

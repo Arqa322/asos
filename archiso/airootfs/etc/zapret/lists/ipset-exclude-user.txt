@@ -1,0 +1,1 @@
+# IP addresses / subnets that must NEVER be touched by zapret (one per line).

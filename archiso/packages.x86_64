@@ -1,0 +1,396 @@
+# ============================================================
+#  Huilo package list (one package per line, '#' = comment)
+#
+#  Section headers with a [tag] are OPTIONAL groups that can be
+#  left out:  ./build.sh --without office,games   (or --minimal)
+#             bash i.sh --without office,games    (online installer)
+#  Sections without a tag are the core system.
+#  List the groups:  scripts/pkg-select.sh --list-groups
+# ============================================================
+
+# ---------- Base / live medium ----------
+base
+base-devel
+linux
+linux-headers
+linux-firmware
+linux-firmware-marvell
+sof-firmware
+amd-ucode
+intel-ucode
+mkinitcpio
+mkinitcpio-archiso
+syslinux
+memtest86+
+memtest86+-efi
+edk2-shell
+efibootmgr
+grub
+os-prober
+arch-install-scripts
+archinstall
+pacman-contrib
+reflector
+sudo
+man-db
+man-pages
+texinfo
+bash-completion
+less
+which
+dialog
+terminus-font
+# boot splash with the Huilo photo
+plymouth
+polkit
+udisks2
+upower
+power-profiles-daemon
+zram-generator
+xdg-user-dirs
+xdg-utils
+pciutils
+usbutils
+curl
+rsync
+gptfdisk
+dosfstools
+btrfs-progs
+e2fsprogs
+exfatprogs
+ntfs-3g
+
+# ---------- Network ----------
+networkmanager
+network-manager-applet
+networkmanager-openvpn
+wireless_tools
+wpa_supplicant
+iwd
+modemmanager
+usb_modeswitch
+bluez
+bluez-utils
+blueman
+nftables
+openssh
+openvpn
+wireguard-tools
+dnsmasq
+
+# ---------- Hyprland desktop ----------
+hyprland
+hyprlock
+hypridle
+hyprpicker
+hyprpolkitagent
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+qt5-wayland
+qt6-wayland
+waybar
+# Huilo look: launcher and menus, notification centre, volume/brightness OSD
+rofi
+rofi-emoji
+rofi-calc
+wtype
+swaync
+swayosd
+hyprsunset
+libnotify
+kitty
+swaybg
+awww
+grim
+slurp
+swappy
+wl-clipboard
+cliphist
+brightnessctl
+playerctl
+thunar
+thunar-archive-plugin
+thunar-volman
+gvfs
+gvfs-mtp
+tumbler
+ffmpegthumbnailer
+file-roller
+nwg-look
+gnome-themes-extra
+adw-gtk-theme
+papirus-icon-theme
+capitaine-cursors
+dconf
+qt5ct
+qt6ct
+# nice text interfaces in scripts (huilo-ai ...)
+gum
+# safe graphics mode (CPU rendering) when Hyprland cannot start, e.g. VMs without 3D
+sway
+foot
+drm-info
+
+# ---------- Audio / video ----------
+pipewire
+pipewire-alsa
+pipewire-pulse
+pipewire-jack
+wireplumber
+pavucontrol
+# system-wide equalizer and effects
+easyeffects
+lsp-plugins-lv2
+calf
+# provides lv2-host for lsp-plugins (otherwise pacman would pull in Ardour)
+pipewire-audio
+# realtime priority for PipeWire (fewer crackles)
+rtkit
+alsa-utils
+mpv
+imv
+
+# ---------- Graphics drivers (Mesa / Vulkan) ----------
+mesa
+mesa-utils
+vulkan-icd-loader
+vulkan-radeon
+vulkan-intel
+vulkan-nouveau
+vulkan-tools
+intel-media-driver
+libva-utils
+
+# ---------- Fonts ----------
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+ttf-dejavu
+ttf-liberation
+ttf-jetbrains-mono-nerd
+otf-font-awesome
+inter-font
+
+# ---------- Browser ----------
+firefox
+firefox-i18n-ru
+
+# ---------- [office] Office (LibreOffice + friends) ----------
+libreoffice-fresh
+libreoffice-fresh-ru
+hunspell
+hunspell-en_us
+hyphen
+hyphen-en
+zathura
+zathura-pdf-mupdf
+tesseract-data-eng
+tesseract-data-rus
+xournalpp
+mousepad
+qalculate-gtk
+keepassxc
+simple-scan
+
+# ---------- [communication] Communication: mail, messengers, torrents ----------
+thunderbird
+thunderbird-i18n-ru
+telegram-desktop
+discord
+qbittorrent
+
+# ---------- [media] Media: streaming/recording, image editing ----------
+obs-studio
+gimp
+
+# ---------- [vscode] VS Code (Code - OSS) ----------
+code
+
+# ---------- [ai] AI assistant: local model runtime (huilo-ai) ----------
+ollama
+glow
+
+# ---------- [games] Atom game pack ----------
+# 32-bit drivers are needed only by Steam/Wine
+lib32-mesa
+lib32-vulkan-icd-loader
+lib32-vulkan-radeon
+lib32-vulkan-intel
+lib32-vulkan-nouveau
+steam
+lutris
+wine-staging
+wine-mono
+wine-gecko
+winetricks
+gamemode
+lib32-gamemode
+mangohud
+lib32-mangohud
+gamescope
+prismlauncher
+lib32-pipewire
+lib32-libpulse
+
+# ---------- [arduino] Embedded: Arduino / microcontrollers ----------
+# (Arduino IDE 2, tio, cutecom, mpremote come from AUR: see archiso/packages.aur)
+arduino-cli
+arduino-language-server
+avrdude
+esptool
+dfu-util
+dfu-programmer
+stlink
+openocd
+flashrom
+platformio-core
+platformio-core-udev
+python-pyserial
+python-pipx
+picocom
+minicom
+moserial
+pulseview
+sigrok-cli
+sigrok-firmware-fx2lafw
+
+# ---------- [nanopi] Embedded: NanoPi / ARM single-board computers ----------
+# (rkdeveloptool and xfel come from AUR: see archiso/packages.aur)
+aarch64-linux-gnu-gcc
+aarch64-linux-gnu-gdb
+qemu-user-static
+qemu-user-static-binfmt
+uboot-tools
+dtc
+sunxi-tools
+android-tools
+rpi-imager
+caligula
+avahi
+nss-mdns
+sshpass
+pv
+pigz
+cmake
+ninja
+meson
+ccache
+
+# ---------- [monitoring] Sysadmin: monitoring / diagnostics ----------
+htop
+btop
+nvtop
+glances
+iotop
+sysstat
+lsof
+strace
+ltrace
+gdb
+perf
+stress-ng
+memtester
+lm_sensors
+dmidecode
+lshw
+hwinfo
+inxi
+smartmontools
+hdparm
+nvme-cli
+
+# ---------- [nettools] Sysadmin: network tools ----------
+nmap
+wireshark-qt
+termshark
+tcpdump
+mtr
+traceroute
+bind
+whois
+iperf3
+nethogs
+iftop
+bandwhich
+ethtool
+net-tools
+inetutils
+openbsd-netcat
+socat
+arp-scan
+ipcalc
+speedtest-cli
+wget
+aria2
+sshfs
+freerdp
+remmina
+tigervnc
+filezilla
+putty
+
+# ---------- [disktools] Sysadmin: disks / backup / recovery ----------
+gparted
+gnome-disk-utility
+parted
+testdisk
+ddrescue
+partclone
+fsarchiver
+clonezilla
+lvm2
+mdadm
+cryptsetup
+xfsprogs
+f2fs-tools
+rclone
+restic
+borg
+chntpw
+
+# ---------- [virt] Sysadmin: virtualization / containers / IaC ----------
+docker
+docker-compose
+docker-buildx
+qemu-desktop
+libvirt
+virt-manager
+edk2-ovmf
+ansible
+opentofu
+kubectl
+helm
+k9s
+
+# ---------- [security] Sysadmin: security ----------
+lynis
+clamav
+
+# ---------- CLI essentials ----------
+fastfetch
+starship
+git
+vim
+neovim
+nano
+micro
+tmux
+screen
+jq
+go-yq
+bat
+ripgrep
+fd
+fzf
+eza
+tree
+ncdu
+duf
+dust
+tealdeer
+unzip
+zip
+7zip
+unrar
+python
+python-pip

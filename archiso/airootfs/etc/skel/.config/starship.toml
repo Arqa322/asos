@@ -1,0 +1,130 @@
+# generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy)
+# Huilo prompt (starship): rounded segments in the Huilo Dusk palette
+"$schema" = "https://starship.rs/config-schema.json"
+
+format = """
+[](fg:amber)\
+$os\
+$username\
+[](fg:amber bg:ink3)\
+$directory\
+[](fg:ink3 bg:ink2)\
+$git_branch\
+$git_status\
+[](fg:ink2 bg:ink1)\
+$c\
+$rust\
+$golang\
+$python\
+$nodejs\
+$lua\
+$docker_context\
+[](fg:ink1)\
+$cmd_duration\
+$line_break\
+$character"""
+
+add_newline = true
+palette = "huilo"
+
+[palettes.huilo]
+ink0 = "#0b0d12"
+ink1 = "#11141b"
+ink2 = "#181c25"
+ink3 = "#222734"
+ink4 = "#2e3445"
+mist = "#8a91a5"
+fog = "#b9bfcc"
+snow = "#ece7dc"
+amber = "#f2a33a"
+honey = "#ffc978"
+ember = "#ff6b4a"
+dusk = "#6f8fc7"
+glacier = "#7cc4d8"
+pine = "#8bc78f"
+berry = "#f0566a"
+heather = "#b08ad8"
+
+[os]
+disabled = false
+style = "bg:amber fg:ink0"
+format = "[ $symbol]($style)"
+
+[os.symbols]
+Arch = "󰣇 "
+Linux = " "
+
+[username]
+show_always = true
+style_user = "bg:amber fg:ink0 bold"
+style_root = "bg:berry fg:ink0 bold"
+format = "[$user ]($style)"
+
+[directory]
+style = "bg:ink3 fg:snow"
+read_only = " 󰌾"
+read_only_style = "bg:ink3 fg:berry"
+format = "[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[directory.substitutions]
+"Документы" = "󰈙 "
+"Загрузки" = " "
+"Музыка" = "󰝚 "
+"Изображения" = " "
+"Arduino" = " "
+
+[git_branch]
+symbol = ""
+style = "bg:ink2 fg:honey"
+format = "[ $symbol $branch]($style)"
+
+[git_status]
+style = "bg:ink2 fg:ember"
+format = "[( $all_status$ahead_behind)]($style)[ ](bg:ink2)"
+
+[c]
+symbol = " "
+style = "bg:ink1 fg:dusk"
+format = "[ $symbol($version)]($style)"
+
+[rust]
+symbol = " "
+style = "bg:ink1 fg:ember"
+format = "[ $symbol($version)]($style)"
+
+[golang]
+symbol = " "
+style = "bg:ink1 fg:glacier"
+format = "[ $symbol($version)]($style)"
+
+[python]
+symbol = " "
+style = "bg:ink1 fg:honey"
+format = "[ $symbol($version)( \\($virtualenv\\))]($style)"
+
+[nodejs]
+symbol = " "
+style = "bg:ink1 fg:pine"
+format = "[ $symbol($version)]($style)"
+
+[lua]
+symbol = " "
+style = "bg:ink1 fg:dusk"
+format = "[ $symbol($version)]($style)"
+
+[docker_context]
+symbol = " "
+style = "bg:ink1 fg:glacier"
+format = "[ $symbol$context]($style)"
+
+[cmd_duration]
+min_time = 2000
+style = "fg:honey"
+format = " [󱦟 $duration]($style)"
+
+[character]
+success_symbol = "[❯](bold fg:amber)"
+error_symbol = "[❯](bold fg:berry)"
+vimcmd_symbol = "[❮](bold fg:amber)"

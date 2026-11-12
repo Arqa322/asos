@@ -1,0 +1,520 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-ai (ии) — AI assistant in the terminal for people new to Linux
+#
+#    ии                       chat: ask in your own words, get an answer and
+#                             ready commands; nothing runs without your "yes"
+#    ии как обновить систему  one question
+#    команда 2>&1 | ии         explain the output of a command (an error ...)
+#    ии объясни               explain the previous command you typed
+#    ии setup                 choose the brain: local (Ollama) or Claude
+#    ии status                what is configured
+#
+#  Brains:
+#    local   Ollama on this computer: free, private, works offline after the
+#            model is downloaded (~1-5 GB). Needs the [ai] group (ollama).
+#    claude  Claude (Anthropic API): smarter, needs internet and an API key
+#            (console.anthropic.com), the question goes to Anthropic.
+#  Settings: ~/.config/huilo/ai.conf   Key: ~/.config/huilo/ai.key (mode 600)
+#  History of the current chat: ~/.local/state/huilo/ai/
+# ============================================================================
+set -uo pipefail
+
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/huilo"
+CONF="$CONF_DIR/ai.conf"
+KEYFILE="$CONF_DIR/ai.key"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/huilo/ai"
+mkdir -p "$STATE" "$CONF_DIR"
+
+# --------------------------------------------------------------- settings ---
+conf() { # KEY DEFAULT — read KEY=value from ai.conf without executing it
+	local v=""
+	[[ -r "$CONF" ]] && v=$(grep -E "^$1=" "$CONF" | tail -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
+	echo "${v:-$2}"
+}
+BACKEND=${HUILO_AI_BACKEND:-$(conf BACKEND auto)}
+LOCAL_MODEL=${HUILO_AI_LOCAL_MODEL:-$(conf LOCAL_MODEL qwen3:4b)}
+CLAUDE_MODEL=${HUILO_AI_MODEL:-$(conf CLAUDE_MODEL claude-opus-5-5)}
+EFFORT=${HUILO_AI_EFFORT:-$(conf EFFORT medium)}
+OLLAMA=${OLLAMA_HOST:-http://127.0.0.1:11434}
+[[ "$OLLAMA" == http* ]] || OLLAMA="http://$OLLAMA"
+API=${HUILO_AI_API_URL:-https://api.anthropic.com/v1/messages}
+
+have() { command -v "$1" >/dev/null 2>&1; }
+GUM=0; have gum && [[ -t 1 ]] && GUM=1
+amber=$'\e[38;2;242;163;58m'; mist=$'\e[38;2;138;145;165m'; berry=$'\e[38;2;240;86;106m'
+pine=$'\e[38;2;139;199;143m'; bold=$'\e[1m'; off=$'\e[0m'
+say()  { printf '%s\n' "$*"; }
+info() { printf '%s›%s %s\n' "$amber" "$off" "$*"; }
+warn() { printf '%s!%s %s\n' "$berry" "$off" "$*" >&2; }
+die()  { warn "$*"; exit 1; }
+
+ask_yes() { # QUESTION -> 0 if yes
+	if (( GUM )); then gum confirm --affirmative "Да" --negative "Нет" "$1"
+	else
+		local a; read -r -p "$1 [д/Н] " a || return 1
+		case "$a" in д|Д|да|Да|ДА|y|Y|yes|Yes) return 0 ;; *) return 1 ;; esac
+	fi
+}
+input() { # PROMPT [PLACEHOLDER]
+	if (( GUM )); then gum input --width 0 --prompt "$1 " --placeholder "${2:-}" </dev/tty
+	else local a; read -r -e -p "$1 " a || return 1; printf '%s' "$a"; fi
+}
+choose() { # HEADER items... -> chosen item
+	local h=$1; shift
+	if (( GUM )); then gum choose --header "$h" "$@"
+	else
+		local i=1 a
+		say "$h" >&2
+		for a in "$@"; do say "  $i) $a" >&2; i=$((i + 1)); done
+		read -r -p "> " a || return 1
+		[[ "$a" =~ ^[0-9]+$ ]] && (( a >= 1 && a <= $# )) || return 1
+		printf '%s\n' "${!a}"
+	fi
+}
+spin() { # TITLE function [args] — runs it in the background under a spinner, prints its output
+	local out pid rc
+	out=$(mktemp "$STATE/reply.XXXXXX")
+	( "${@:2}" >"$out"; echo $? >"$out.rc" ) &
+	pid=$!
+	if (( GUM )); then
+		if ! gum spin --spinner dot --title "$1" -- bash -c "while kill -0 $pid 2>/dev/null; do sleep 0.1; done" >&2; then
+			kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; rm -f "$out" "$out.rc"; return 130
+		fi
+	else
+		printf '%s%s…%s\n' "$mist" "$1" "$off" >&2
+	fi
+	wait "$pid" 2>/dev/null
+	cat "$out"
+	rc=$(cat "$out.rc" 2>/dev/null || echo 1)
+	rm -f "$out" "$out.rc"
+	return "$rc"
+}
+show_md() {
+	if have glow && [[ -t 1 ]]; then glow -s dark -w "$(( $(tput cols 2>/dev/null || echo 90) - 4 ))" -
+	else # plain terminal: **bold** and `code` by hand
+		sed -E -e "s/\*\*([^*]+)\*\*/${bold}\1${off}/g" -e "s/\`([^\`]+)\`/${amber}\1${off}/g"; echo
+	fi
+}
+
+# ------------------------------------------------------------ the prompt ---
+system_prompt() {
+	cat <<'EOF'
+You are the built-in assistant of Huilo, a Linux distribution based on Arch Linux with the Hyprland desktop. You help people who have never used Linux or a terminal. They write in everyday words, often in Russian; answer in the language of the question (Russian by default).
+
+How to answer:
+- Start with the direct answer in one or two short sentences, then short numbered steps if needed. No jargon; explain any unavoidable term in a few words.
+- When a terminal command helps, put it in "commands" (at most 3, in the order to run them). Each command is one bash line that works on Huilo as is: no placeholders like <name> unless you say exactly what to replace in "explain". Prefer the Huilo tools below over generic recipes. Never repeat the commands inside "answer".
+- If the task is easier in the graphical interface, say where to click instead of giving commands.
+- Never invent package names or options. If unsure whether a package exists, give `pacman -Ss word` to search first.
+- Mark every command's risk honestly: "safe" (only reads or shows something), "caution" (changes settings or installs/removes software), "danger" (can delete data, break booting, or lock the user out). For "danger" explain in "explain" what can go wrong and how to undo it; offer a safer alternative when there is one.
+- Never propose commands that disable security for no reason, download and run scripts from unknown sites, or delete user files without the user clearly asking for it.
+- If the user shows command output or an error, explain in plain words what it means and how to fix it.
+- If you need more details, ask one short question in "follow_up". Otherwise use "follow_up" for one useful next step, or leave it empty.
+
+What is installed on Huilo (use it):
+- Packages: `sudo pacman -S name` (install), `sudo pacman -Rns name` (remove), `sudo pacman -Syu` (update everything), `pacman -Ss word` (search), `yay -S name` for AUR. Flatpak is not set up by default.
+- Desktop: Hyprland (config in Lua: ~/.config/hypr/hyprland.lua; the user's own settings go to ~/.config/hypr/user.lua, which survives updates). Bar: waybar. Menus: rofi. Notifications: swaync. Terminal: kitty. Files: Thunar. Browser: Firefox. Office: LibreOffice.
+- Hotkeys: SUPER+Space Huilo menu, SUPER+D apps, SUPER+Enter terminal, SUPER+Q close window, SUPER+E files, SUPER+B browser, SUPER+W wallpapers, SUPER+N notifications, SUPER+L lock, SUPER+BackSpace power menu, SUPER+F1 all hotkeys, SUPER+I this assistant, Alt+Shift switches the keyboard layout (EN/RU).
+- huilo-zapret: bypass of DPI blocking (YouTube, Discord ...): `huilo-zapret menu`, `sudo huilo-zapret toggle`, `huilo-zapret check`.
+- huilo-wallpaper pick | next; huilo-eq menu (sound equaliser presets); huilo-theme night toggle (warm night light).
+- huilo-logwatch show (recent serious system errors), huilo-logs (collect logs into an archive for a bug report; --redact hides personal data), huilo-doctor (graphics diagnostics).
+- huilo-session --set MODE (graphics modes when the desktop does not start: hyprland, hyprland-vm, hyprland-software, sway-software), huilo-groups (add/remove optional software groups), huilo-update (update Huilo's own scripts and configs; system packages: sudo pacman -Syu).
+- huilo-install: install from the live USB to a disk. huilo-arduino menu, huilo-nanopi menu: electronics boards. huilo-game: game tweaks (Steam, Lutris, GameMode).
+- Network: NetworkManager (`nmcli`, `nmtui`), Bluetooth: blueman-manager or bluetoothctl. Sound: PipeWire (pavucontrol, wpctl).
+EOF
+}
+
+context_line() { # facts about this computer for the first question
+	local live=no virt sess zap
+	grep -q archisobasedir /proc/cmdline 2>/dev/null && live=yes
+	virt=$(systemd-detect-virt --vm 2>/dev/null || true); virt=${virt:-none}
+	if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then sess=hyprland
+	elif [[ -n "${SWAYSOCK:-}" ]]; then sess="sway (safe graphics mode)"
+	elif [[ -n "${WAYLAND_DISPLAY:-}" ]]; then sess=wayland
+	else sess="text console"; fi
+	zap=$(systemctl is-active zapret 2>/dev/null || true)
+	printf '[Computer: live USB=%s, virtual machine=%s, session=%s, zapret=%s, user=%s, folder=%s, date=%s]' \
+		"$live" "$virt" "$sess" "${zap:-unknown}" "${USER:-$(id -un)}" "${PWD/#"$HOME"/"~"}" "$(date +%F)"
+}
+
+SCHEMA='{
+  "type": "object",
+  "properties": {
+    "answer": {"type": "string", "description": "Plain-language answer in Markdown, without the commands"},
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "command": {"type": "string", "description": "One bash line"},
+          "explain": {"type": "string", "description": "What it does, in plain words"},
+          "risk": {"type": "string", "enum": ["safe", "caution", "danger"]}
+        },
+        "required": ["command", "explain", "risk"],
+        "additionalProperties": false
+      }
+    },
+    "follow_up": {"type": "string", "description": "One short question or next step, or empty"}
+  },
+  "required": ["answer", "commands", "follow_up"],
+  "additionalProperties": false
+}'
+
+# ------------------------------------------------------------- backends ---
+api_key() {
+	if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then echo "$ANTHROPIC_API_KEY"
+	elif [[ -r "$KEYFILE" ]]; then tr -d ' \n\r' <"$KEYFILE"
+	fi
+}
+ollama_up() { curl -fsS -m 2 "$OLLAMA/api/version" >/dev/null 2>&1; }
+ollama_start() {
+	ollama_up && return 0
+	have ollama || return 1
+	if systemctl list-unit-files ollama.service >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+		sudo -n systemctl start ollama 2>/dev/null
+	fi
+	ollama_up || setsid -f ollama serve >"$STATE/ollama.log" 2>&1
+	for _ in $(seq 1 40); do ollama_up && return 0; sleep 0.25; done
+	return 1
+}
+ollama_has_model() { curl -fsS -m 5 "$OLLAMA/api/tags" 2>/dev/null | jq -e --arg m "$LOCAL_MODEL" '.models[]? | select(.name == $m or .model == $m)' >/dev/null; }
+
+pick_backend() {
+	case "$BACKEND" in
+		local|claude) echo "$BACKEND" ;;
+		*)
+			if have ollama && ollama_start && ollama_has_model; then echo local
+			elif [[ -n "$(api_key)" ]]; then echo claude
+			else echo none; fi ;;
+	esac
+}
+
+# Claude (Anthropic Messages API, raw HTTP). History: $HIST (JSON array of messages).
+ask_claude() {
+	local key body resp stop
+	key=$(api_key)
+	[[ -n "$key" ]] || die "нет ключа Claude: ии setup"
+	body=$(jq -n --arg model "$CLAUDE_MODEL" --arg effort "$EFFORT" --arg system "$(system_prompt)" \
+		--argjson schema "$SCHEMA" --slurpfile msgs "$HIST" '{
+		model: $model,
+		max_tokens: 16000,
+		fallbacks: "default",
+		output_config: {effort: $effort, format: {type: "json_schema", schema: $schema}},
+		cache_control: {type: "ephemeral"},
+		system: $system,
+		messages: $msgs[0]
+	}')
+	resp=$(curl -sS -m 300 "$API" \
+		-H "Content-Type: application/json" \
+		-H "x-api-key: $key" \
+		-H "anthropic-version: 2026-10-21" \
+		-H "anthropic-beta: server-side-fallback-2026-07-01" \
+		--data-binary @- <<<"$body") || { warn "нет связи с api.anthropic.com (интернет? zapret?)"; return 1; }
+	if jq -e '.type == "error"' >/dev/null 2>&1 <<<"$resp"; then
+		local t m
+		t=$(jq -r '.error.type' <<<"$resp"); m=$(jq -r '.error.message' <<<"$resp")
+		case "$t" in
+			authentication_error) warn "ключ не подошёл — проверьте его: ии setup" ;;
+			permission_error) warn "доступ запрещён: $m" ;;
+			rate_limit_error|overloaded_error) warn "Claude сейчас перегружен, попробуйте через минуту" ;;
+			*) warn "ошибка Claude ($t): $m" ;;
+		esac
+		return 1
+	fi
+	stop=$(jq -r '.stop_reason // empty' <<<"$resp")
+	if [[ "$stop" == refusal ]]; then
+		warn "Claude отказался отвечать на этот вопрос. Переформулируйте или спросите локальную модель (ии setup)."
+		return 1
+	fi
+	# keep the assistant turn exactly as returned (thinking blocks included)
+	jq --argjson c "$(jq '.content' <<<"$resp")" '. + [{role: "assistant", content: $c}]' "$HIST" >"$HIST.tmp" && mv "$HIST.tmp" "$HIST"
+	if [[ "$stop" == max_tokens ]]; then warn "ответ обрезан (слишком длинный)"; fi
+	jq -r '[.content[] | select(.type == "text") | .text] | join("")' <<<"$resp"
+}
+
+# Ollama (local). History: $HIST (JSON array of {role, content} strings).
+ask_local() {
+	local body resp out think=true
+	ollama_start || die "Ollama не запускается. Журнал: $STATE/ollama.log"
+	ollama_has_model || die "модель $LOCAL_MODEL не скачана: ии setup"
+	for try in 1 2; do
+		body=$(jq -n --arg model "$LOCAL_MODEL" --arg system "$(system_prompt)" --argjson schema "$SCHEMA" \
+			--argjson think "$think" --slurpfile msgs "$HIST" '{
+			model: $model, stream: false, format: $schema, options: {temperature: 0.3, num_ctx: 8192},
+			messages: ([{role: "system", content: $system}] + $msgs[0])
+		} + (if $think then {think: false} else {} end)')
+		resp=$(curl -sS -m 600 "$OLLAMA/api/chat" -H "Content-Type: application/json" --data-binary @- <<<"$body") \
+			|| { warn "Ollama не ответила"; return 1; }
+		if jq -e '.error' >/dev/null 2>&1 <<<"$resp"; then
+			# models without a "thinking" switch reject think:false — retry without it
+			if [[ $try == 1 ]] && jq -r '.error' <<<"$resp" | grep -qi 'think'; then think=false; continue; fi
+			warn "Ollama: $(jq -r '.error' <<<"$resp")"; return 1
+		fi
+		break
+	done
+	out=$(jq -r '.message.content // empty' <<<"$resp")
+	jq --arg c "$out" '. + [{role: "assistant", content: $c}]' "$HIST" >"$HIST.tmp" && mv "$HIST.tmp" "$HIST"
+	printf '%s' "$out"
+}
+
+# -------------------------------------------------------------- safety ---
+# a second opinion on top of the model's own risk mark
+local_risk() {
+	local c=$1
+	if grep -qiE '(^|[;&|[:space:]])(rm[[:space:]]+-[a-z]*r[a-z]*f?[[:space:]]+(/|~|\$HOME|\*)([[:space:]]|$)|mkfs|wipefs|sgdisk[[:space:]]+-[zZ]|dd[[:space:]].*of=/dev/|shred|blkdiscard|fdisk|parted|cryptsetup[[:space:]]+(luksFormat|erase))' <<<"$c" \
+		|| grep -qE ':\(\)\{|>[[:space:]]*/dev/(sd|nvme|vd|mmcblk)|chmod[[:space:]]+-R[[:space:]]+[0-7]*7[[:space:]]+/|chown[[:space:]]+-R.*[[:space:]]/($|[[:space:]])' <<<"$c" \
+		|| grep -qiE '(curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z)?sh' <<<"$c" \
+		|| grep -qiE 'pacman[[:space:]]+-R[a-z]*[[:space:]].*\b(linux|base|systemd|glibc|pacman|sudo|grub)\b' <<<"$c"; then
+		echo danger
+	elif grep -qE '(^|[;&|[:space:]])(sudo|pacman[[:space:]]+-[SRU]|systemctl[[:space:]]+(enable|disable|mask|stop|restart)|rm|mv|chmod|chown|userdel|usermod|passwd|reboot|poweroff|shutdown)([[:space:]]|$)' <<<"$c"; then
+		echo caution
+	else
+		echo safe
+	fi
+}
+worst() { # two risk words -> the worse
+	case "$1$2" in *danger*) echo danger ;; *caution*) echo caution ;; *) echo safe ;; esac
+}
+
+# -------------------------------------------------------------- display ---
+render() { # JSON reply -> screen; sets CMDS (array) and RISKS
+	local j=$1 n i c e r
+	CMDS=(); RISKS=()
+	if ! jq -e 'type == "object" and has("answer")' >/dev/null 2>&1 <<<"$j"; then
+		say "$j" | show_md; return 0
+	fi
+	echo
+	jq -r '.answer' <<<"$j" | show_md
+	n=$(jq '.commands | length' <<<"$j")
+	for ((i = 0; i < n; i++)); do
+		c=$(jq -r ".commands[$i].command" <<<"$j")
+		e=$(jq -r ".commands[$i].explain" <<<"$j")
+		r=$(worst "$(jq -r ".commands[$i].risk" <<<"$j")" "$(local_risk "$c")")
+		CMDS+=("$c"); RISKS+=("$r")
+		local tag col
+		case "$r" in
+			danger) tag="ОПАСНО"; col=$berry ;;
+			caution) tag="меняет систему"; col=$amber ;;
+			*) tag="безопасно"; col=$pine ;;
+		esac
+		printf '  %s%s%d%s  %s%s%s   %s[%s]%s\n' "$bold" "$amber" $((i + 1)) "$off" "$bold" "$c" "$off" "$col" "$tag" "$off"
+		printf '     %s%s%s\n\n' "$mist" "$e" "$off"
+	done
+	local f; f=$(jq -r '.follow_up // empty' <<<"$j")
+	[[ -n "$f" ]] && printf '%s%s%s\n\n' "$mist" "$f" "$off"
+	return 0
+}
+
+run_cmd() { # INDEX -> runs CMDS[i] after confirmation; output goes to $LAST_OUT
+	local c=${CMDS[$1]} r=${RISKS[$1]} rc
+	if [[ $r == danger ]]; then
+		warn "Эта команда может удалить данные или сломать систему:"
+		say "    $c"
+		local a; a=$(input "Чтобы выполнить, напишите слово «выполнить»:" "") || return 1
+		[[ "$a" == выполнить ]] || { info "Отменено."; return 1; }
+	else
+		ask_yes "Выполнить: $c ?" || { info "Отменено."; return 1; }
+	fi
+	printf '%s$ %s%s\n' "$mist" "$c" "$off"
+	LAST_OUT="$STATE/last-output.txt"
+	# a pseudo-terminal keeps colours, progress bars and full-screen programs working
+	if have script; then
+		script -q -e -c "$c" "$STATE/last-output.raw"
+		rc=$?
+		sed -e 's/\x1b\[[0-9;?]*[A-Za-z]//g' -e 's/\x1b\][^\x07]*\x07//g' -e '/^Script \(started\|done\)/d' "$STATE/last-output.raw" | tr -d '\r' >"$LAST_OUT"
+		rm -f "$STATE/last-output.raw"
+	else
+		bash -c "$c" 2>&1 | tee "$LAST_OUT"
+		rc=${PIPESTATUS[0]}
+	fi
+	LAST_RC=$rc
+	LAST_CMD=$c
+	if (( rc == 0 )); then printf '%s✓ готово%s\n' "$pine" "$off"
+	else printf '%s✗ команда завершилась с ошибкой (код %d)%s\n' "$berry" "$rc" "$off"; fi
+	return 0
+}
+
+copy_cmd() {
+	local c=${CMDS[$1]}
+	if have wl-copy && [[ -n "${WAYLAND_DISPLAY:-}" ]]; then printf '%s' "$c" | wl-copy && info "Скопировано — вставьте в терминал Ctrl+Shift+V"
+	else say "$c"; fi
+}
+
+# ------------------------------------------------------------- the chat ---
+new_chat() {
+	HIST="$STATE/chat-$(date +%Y%m%d-%H%M%S)-$$.json"
+	echo '[]' >"$HIST"
+	FIRST=1
+	find "$STATE" -name 'chat-*.json' -mtime +7 -delete 2>/dev/null
+}
+
+ask() { # TEXT -> asks the model, renders, offers actions
+	local text=$1 reply
+	if (( FIRST )); then text="$(context_line)"$'\n'"$text"; FIRST=0; fi
+	jq --arg t "$text" '. + [{role: "user", content: $t}]' "$HIST" >"$HIST.tmp" && mv "$HIST.tmp" "$HIST"
+	case "$BRAIN" in
+		claude) reply=$(spin "Думаю (Claude)" ask_claude) || return 1 ;;
+		local) reply=$(spin "Думаю (локальная модель $LOCAL_MODEL, может занять минуту)" ask_local) || return 1 ;;
+	esac
+	render "$reply"
+}
+
+actions() { # after an answer: run / copy / explain the result / ask more
+	local opts=() i choice
+	while :; do
+		opts=()
+		for i in "${!CMDS[@]}"; do opts+=("Выполнить $((i + 1)): ${CMDS[$i]:0:60}"); done
+		for i in "${!CMDS[@]}"; do opts+=("Скопировать $((i + 1))"); done
+		[[ -n "${LAST_OUT:-}" && -s "${LAST_OUT:-}" ]] && opts+=("Объяснить результат")
+		opts+=("Задать новый вопрос" "Выйти")
+		choice=$(choose "Что дальше?" "${opts[@]}") || return 1
+		case "$choice" in
+			Выполнить\ *) i=${choice#Выполнить }; i=${i%%:*}; run_cmd $((i - 1)) ;;
+			Скопировать\ *) i=${choice#Скопировать }; copy_cmd $((i - 1)) ;;
+			"Объяснить результат")
+				local out; out=$(tail -n 80 "$LAST_OUT")
+				LAST_OUT=""
+				ask "Я выполнил: $LAST_CMD"$'\n'"Код выхода: $LAST_RC. Вывод (последние строки):"$'\n'"$out"$'\n'"Что это значит и что делать дальше?" || true ;;
+			"Задать новый вопрос") return 0 ;;
+			*) return 1 ;;
+		esac
+	done
+}
+
+banner() {
+	if (( GUM )); then
+		gum style --border rounded --border-foreground "#f2a33a" --padding "0 2" --margin "1 0" \
+			"$(printf '%sИИ-помощник Huilo%s' "$bold" "$off")" \
+			"Спросите что угодно своими словами: «как установить телеграм», «почему нет звука»." \
+			"Команды выполняются только после вашего подтверждения.  Выход — пустая строка или Ctrl+C." \
+			"Мозг: $1"
+	else
+		say "== ИИ-помощник Huilo ($1) — спросите своими словами; пустая строка — выход =="
+	fi
+}
+
+brain_name() {
+	case "$1" in
+		claude) echo "Claude ($CLAUDE_MODEL, через интернет)" ;;
+		local) echo "локальная модель $LOCAL_MODEL (Ollama, без интернета)" ;;
+	esac
+}
+
+# ---------------------------------------------------------------- setup ---
+setup() {
+	have jq && have curl || die "нужны jq и curl: sudo pacman -S jq curl"
+	local mem_gb choice
+	mem_gb=$(awk '/MemTotal/ {printf "%d", $2/1048576}' /proc/meminfo)
+	say ""
+	info "Где будет «думать» помощник?"
+	choice=$(choose "Выберите:" \
+		"Локально (Ollama): бесплатно, приватно, работает без интернета" \
+		"Claude (Anthropic): умнее, нужен интернет и API-ключ" \
+		"Отмена") || exit 0
+	case "$choice" in
+		Локально*)
+			if ! have ollama; then
+				info "Нужна программа Ollama (группа [ai])."
+				ask_yes "Установить ollama сейчас (sudo pacman -S ollama)?" || exit 0
+				sudo pacman -S --needed ollama || die "не удалось установить ollama"
+				if lspci 2>/dev/null | grep -qi 'vga.*nvidia\|3d.*nvidia'; then
+					ask_yes "Найдена видеокарта NVIDIA. Установить ускорение ollama-cuda (~2 ГБ)?" && sudo pacman -S --needed ollama-cuda
+				fi
+			fi
+			local model=qwen3:4b
+			(( mem_gb < 7 )) && model=qwen3:1.7b
+			(( mem_gb >= 16 )) && model=qwen3:8b
+			model=$(choose "Модель (сейчас памяти: ${mem_gb} ГБ; рекомендуется $model):" \
+				"$model" "qwen3:1.7b  (1.4 ГБ, для слабых ПК)" "qwen3:4b  (2.6 ГБ)" "qwen3:8b  (5.2 ГБ, нужна память 16 ГБ)") || exit 0
+			model=${model%% *}
+			LOCAL_MODEL=$model
+			ollama_start || die "Ollama не запускается. Журнал: $STATE/ollama.log"
+			info "Скачиваю модель $model (один раз)…"
+			ollama pull "$model" || die "не удалось скачать модель (интернет? zapret: huilo-zapret menu)"
+			write_conf BACKEND local LOCAL_MODEL "$model"
+			info "Готово: помощник работает на этом компьютере. Спросите: ии как дела" ;;
+		Claude*)
+			say ""
+			say "1. Откройте https://console.anthropic.com/ → API Keys → Create Key."
+			say "2. Скопируйте ключ (начинается с sk-ant-) и вставьте ниже."
+			say "${mist}Вопросы и показанный вывод команд будут отправляться в Anthropic. Не показывайте помощнику пароли.${off}"
+			say "${mist}Claude доступен не во всех странах — если не работает, выберите локальную модель.${off}"
+			local key
+			if (( GUM )); then key=$(gum input --password --width 0 --placeholder "sk-ant-…" --prompt "Ключ: ")
+			else read -r -s -p "Ключ: " key; echo; fi
+			[[ -n "$key" ]] || exit 0
+			( umask 077; printf '%s\n' "$key" >"$KEYFILE" )
+			chmod 600 "$KEYFILE"
+			write_conf BACKEND claude
+			BRAIN=claude; new_chat
+			info "Проверяю ключ…"
+			if ask "Ответь одним предложением: ты на связи?" >/dev/null; then info "Ключ работает. Спросите: ии как дела"
+			else warn "проверка не удалась — ключ сохранён, попробуйте ещё раз позже: ии"; fi ;;
+		*) exit 0 ;;
+	esac
+}
+
+write_conf() { # KEY VALUE ... -> ai.conf
+	local tmp; tmp=$(mktemp)
+	[[ -f "$CONF" ]] && cp "$CONF" "$tmp" || printf '# huilo-ai settings (ии setup). Brains: local | claude | auto\n' >"$tmp"
+	while (( $# >= 2 )); do
+		grep -v -E "^$1=" "$tmp" >"$tmp.2"; mv "$tmp.2" "$tmp"
+		printf '%s=%s\n' "$1" "$2" >>"$tmp"
+		shift 2
+	done
+	mv "$tmp" "$CONF"
+}
+
+status() {
+	say "мозг (BACKEND):   $BACKEND → сейчас используется: $(pick_backend)"
+	say "локальная модель: $LOCAL_MODEL ($(have ollama && echo 'ollama установлена' || echo 'ollama не установлена'), $(ollama_up && echo 'сервер работает' || echo 'сервер не запущен'))"
+	say "Claude:           $CLAUDE_MODEL, effort $EFFORT, ключ: $([[ -n "$(api_key)" ]] && echo есть || echo нет)"
+	say "настройки:        $CONF"
+}
+
+# ----------------------------------------------------------------- main ---
+case "${1:-}" in
+	-h|--help|help) sed -n '2,22p' "$0"; exit 0 ;;
+	setup) setup; exit 0 ;;
+	status) status; exit 0 ;;
+esac
+have jq && have curl || die "нужны jq и curl: sudo pacman -S jq curl"
+
+BRAIN=$(pick_backend)
+if [[ $BRAIN == none ]]; then
+	warn "Помощник ещё не настроен."
+	if { true </dev/tty; } 2>/dev/null; then
+		ask_yes "Настроить сейчас?" </dev/tty && { setup </dev/tty; BRAIN=$(pick_backend); }
+	fi
+	[[ $BRAIN == none ]] && exit 1
+fi
+
+new_chat
+question="$*"
+# piped input: explain it
+if [[ ! -t 0 ]]; then
+	piped=$(head -c 12000)
+	if { true </dev/tty; } 2>/dev/null; then exec </dev/tty; fi
+	if [[ -n "$piped" ]]; then
+		[[ "$BRAIN" == claude ]] && printf '%sВывод будет отправлен в Anthropic (Claude).%s\n' "$mist" "$off"
+		question="${question:-Объясни простыми словами, что здесь написано и что делать.}"$'\n\nВывод команды:\n'"$piped"
+	fi
+fi
+# "ии объясни" with no other words: the previous command from the shell history
+if [[ "$question" =~ ^(объясни|explain|что\ это)$ && -n "${HUILO_AI_LAST_CMD:-}" ]]; then
+	question="Объясни простыми словами, что делает команда: ${HUILO_AI_LAST_CMD}"
+fi
+
+if [[ -z "$question" ]]; then banner "$(brain_name "$BRAIN")"; fi
+while :; do
+	if [[ -z "$question" ]]; then
+		question=$(input "› Ваш вопрос:" "например: как установить Telegram") || break
+		[[ -n "$question" ]] || break
+	fi
+	CMDS=(); LAST_OUT=""
+	rc=0
+	ask "$question" || rc=1
+	question=""
+	if [[ -t 0 ]]; then actions || break; else exit "$rc"; fi
+done

@@ -1,0 +1,92 @@
+/* Huilo notifications and control centre (swaync). Loaded on top of the
+   packaged /etc/xdg/swaync/style.css. Colours: theme/palette.toml */
+:root {
+  --cc-bg: rgba(@{ink1.rgb}, 0.94);
+  --noti-border-color: rgba(@{ink4.rgb}, 1);
+  --noti-bg: @{ink2.rgb};
+  --noti-bg-alpha: 0.96;
+  --noti-bg-darker: @{ink1};
+  --noti-bg-hover: @{ink3};
+  --noti-bg-focus: rgba(@{ink3.rgb}, 0.8);
+  --noti-close-bg: rgba(@{snow.rgb}, 0.08);
+  --noti-close-bg-hover: rgba(@{snow.rgb}, 0.16);
+  --text-color: @{snow};
+  --text-color-disabled: @{mist};
+  --bg-selected: @{amber};
+  --border-radius: 16px;
+  --font-size-body: 13px;
+  --font-size-summary: 14px;
+  --notification-icon-size: 48px;
+  --notification-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+* { font-family: "@{font.ui}", "@{font.mono}", sans-serif; }
+
+.notification-row .notification-background .notification {
+  border: 1px solid var(--noti-border-color);
+  box-shadow: var(--notification-shadow);
+}
+.notification-row .notification-background .notification.critical {
+  border: 1px solid @{berry};
+  background: linear-gradient(90deg, rgba(@{berry.rgb}, 0.20), rgba(@{ink2.rgb}, 0.96) 45%);
+}
+.notification-row .notification-background .notification.low { opacity: 0.92; }
+.notification .notification-default-action .notification-content .text-box .summary { font-weight: 700; }
+.notification .notification-default-action .notification-content .text-box .time { color: @{mist}; font-weight: 500; }
+.notification .notification-default-action .notification-content .text-box .body { color: @{fog}; }
+.notification-action > button {
+  background: rgba(@{snow.rgb}, 0.06);
+  border: 1px solid rgba(@{ink4.rgb}, 1);
+}
+.notification-action > button:hover { background: rgba(@{amber.rgb}, 0.18); }
+progressbar progress { background: @{amber}; }
+
+.control-center {
+  border: 1px solid rgba(@{ink4.rgb}, 1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+}
+.widget-title > label { font-size: 1.25rem; font-weight: 700; }
+.widget-title > button {
+  background: rgba(@{snow.rgb}, 0.06);
+  border: 1px solid rgba(@{ink4.rgb}, 1);
+  color: @{fog};
+  padding: 2px 12px;
+}
+.widget-title > button:hover { background: rgba(@{berry.rgb}, 0.25); color: @{snow}; }
+
+.widget-dnd > switch { background: @{ink3}; border-radius: 99px; }
+.widget-dnd > switch:checked { background: @{amber}; }
+.widget-dnd > switch slider { background: @{snow}; border-radius: 99px; }
+
+.widget-buttons-grid { padding: 6px; }
+.widget-buttons-grid flowboxchild > button {
+  min-height: 46px;
+  background: @{ink2};
+  border: 1px solid rgba(@{ink4.rgb}, 1);
+  color: @{fog};
+  font-size: 18px;
+}
+.widget-buttons-grid flowboxchild > button:hover { background: @{ink3}; color: @{snow}; }
+.widget-buttons-grid flowboxchild > button.toggle:checked {
+  background: linear-gradient(135deg, @{amber}, @{ember});
+  color: @{ink0};
+  border-color: transparent;
+}
+
+.widget-volume {
+  background: @{ink2};
+  border: 1px solid rgba(@{ink4.rgb}, 1);
+}
+.widget-volume > box > label { color: @{honey}; font-size: 18px; margin-right: 6px; }
+scale trough { background: @{ink3}; border-radius: 99px; min-height: 6px; }
+scale trough highlight { background: linear-gradient(90deg, @{amber}, @{ember}); border-radius: 99px; }
+scale slider { background: @{snow}; border-radius: 99px; min-width: 14px; min-height: 14px; }
+
+.widget-mpris .widget-mpris-player {
+  background: @{ink2};
+  border: 1px solid rgba(@{ink4.rgb}, 1);
+  border-radius: 16px;
+}
+.widget-mpris .widget-mpris-title { font-weight: 700; }
+.widget-mpris .widget-mpris-subtitle { color: @{mist}; }

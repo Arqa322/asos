@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# huilo-legacy — runs a renamed command under its old name (see
+# /usr/share/huilo/legacy.map). Old names are symlinks to this script.
+#   huilo-legacy --list     show the table
+set -uo pipefail
+MAP=${HUILO_LEGACY_MAP:-/usr/share/huilo/legacy.map}
+self=$(basename "$0")
+if [[ "$self" == huilo-legacy ]]; then
+	case "${1:-}" in
+		--list|-l|"") grep -v '^#' "$MAP" | awk 'NF {printf "%-16s -> %-22s (removed after %s)\n", $1, $2 ($3 ~ /^[0-9]/ ? "" : " " $3), $NF}'; exit 0 ;;
+		*) self=$1; shift ;;
+	esac
+fi
+line=$(awk -v n="$self" '$1 == n' "$MAP" 2>/dev/null)
+[[ -n "$line" ]] || { echo "huilo-legacy: unknown old command '$self'" >&2; exit 127; }
+read -r -a f <<<"$line"
+# fields: old, new command words..., since, remove-after
+n=${#f[@]}
+new=("${f[@]:1:n-3}")
+if [[ -t 2 ]]; then
+	printf '\e[33m!!\e[0m %s переименована в «%s» (старое имя уберём после %s)\n' "$self" "${new[*]}" "${f[n-1]}" >&2
+fi
+logger -t huilo-legacy "old command $self used, now ${new[*]}" 2>/dev/null || true
+exec "${new[@]}" "$@"

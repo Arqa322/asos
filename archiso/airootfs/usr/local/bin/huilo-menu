@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-menu — the menus of Huilo (rofi, theme /usr/share/rofi/themes/huilo*)
+#
+#    huilo-menu apps        applications (SUPER+D)
+#    huilo-menu hub         everything Huilo in one list (SUPER+Space)
+#    huilo-menu power       lock / log out / suspend / reboot / power off
+#    huilo-menu clipboard   clipboard history (SUPER+C)
+#    huilo-menu emoji       emoji picker (SUPER+.)
+#    huilo-menu calc        calculator (SUPER+=)
+#    huilo-menu wifi        Wi-Fi networks
+#    huilo-menu run         run a command
+#    huilo-menu dmenu PROMPT [list|grid|power]   pick a line from stdin
+#                           (used by huilo-eq, huilo-wallpaper ...)
+#  Pressing the same key again closes an open menu.
+# ============================================================================
+set -uo pipefail
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/huilo"
+THUMB_DEFAULT=/usr/share/backgrounds/huilo/thumbs/huilo-peaks.jpg
+have() { command -v "$1" >/dev/null 2>&1; }
+term() { # run a text program in a floating terminal
+	local title=$1; shift
+	if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && have kitty; then
+		setsid -f kitty --class huilo-float --title "$title" -e "$@" >/dev/null 2>&1
+	else
+		setsid -f foot -T "$title" "$@" >/dev/null 2>&1
+	fi
+}
+hold() { # keep the window open after the command ends
+	printf '%q ' "$@"; printf '; echo; read -rsn1 -p "Нажмите любую клавишу…"'
+}
+
+# a second press of the hotkey closes the menu instead of opening another one
+toggle_close() { if pgrep -x rofi >/dev/null; then pkill -x rofi; exit 0; fi; }
+
+wall_thumb() {
+	local t
+	t=$(readlink -f "$STATE/wallpaper/thumb" 2>/dev/null || true)
+	[[ -n "$t" && -f "$t" ]] || t=$THUMB_DEFAULT
+	echo "$t"
+}
+
+# dmenu PROMPT [list|grid|power] [rofi args...]  — lines on stdin, choice on stdout
+dmenu() {
+	local prompt=$1 variant=${2:-list}
+	shift 2 2>/dev/null || shift $#
+	if have rofi; then
+		rofi -dmenu -i -p "$prompt" -theme "huilo-$variant" -show-icons "$@"
+	elif have wofi; then # very old installs without rofi
+		sed 's/\x00.*//' | wofi --dmenu --prompt "$prompt"
+	else
+		echo "huilo-menu: rofi is not installed (sudo pacman -S rofi)" >&2
+		return 1
+	fi
+}
+
+# one menu line with an icon: row "Text" icon-name
+row() { printf '%s\0icon\x1f%s\n' "$1" "$2"; }
+
+apps() {
+	toggle_close
+	have rofi || exec wofi --show drun
+	rofi -show drun -modes "drun,run" -theme huilo \
+		-theme-str "imagebox { background-image: url(\"$(wall_thumb)\", height); }"
+}
+
+run_cmd() {
+	toggle_close
+	rofi -show run -theme huilo-list
+}
+
+power() {
+	toggle_close
+	local c
+	c=$({
+		row "Заблокировать" system-lock-screen
+		row "Сон" system-suspend
+		row "Выйти" system-log-out
+		row "Перезагрузка" system-reboot
+		row "Выключение" system-shutdown
+	} | dmenu "Питание" power -selected-row 0) || exit 0
+	case "$c" in
+		Заблокировать) loginctl lock-session 2>/dev/null; pidof hyprlock >/dev/null || hyprlock ;;
+		Сон) systemctl suspend ;;
+		Выйти)
+			if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then hyprctl dispatch 'hl.dsp.exit()'
+			else swaymsg exit; fi ;;
+		Перезагрузка) systemctl reboot ;;
+		Выключение) systemctl poweroff ;;
+	esac
+}
+
+clipboard() {
+	toggle_close
+	have cliphist || { notify-send -a Huilo "Буфер обмена" "cliphist не установлен"; exit 1; }
+	local c
+	c=$(cliphist list | dmenu "Буфер обмена" list -display-columns 2 -mesg "Enter — вставить в буфер, Shift+Del — удалить строку" \
+		-kb-custom-1 "Shift+Delete")
+	local rc=$?
+	if (( rc == 10 )) && [[ -n "$c" ]]; then cliphist delete <<<"$c"; exec "$0" clipboard; fi
+	[[ $rc -eq 0 && -n "$c" ]] || exit 0
+	cliphist decode <<<"$c" | wl-copy
+}
+
+emoji() {
+	toggle_close
+	if [[ -e /usr/lib/rofi/emoji.so ]]; then
+		rofi -modi emoji -show emoji -theme huilo-list -emoji-format '{emoji}  {name}'
+	else
+		notify-send -a Huilo "Эмодзи" "Нужен пакет rofi-emoji"
+	fi
+}
+
+calc() {
+	toggle_close
+	if [[ -e /usr/lib/rofi/libcalc.so ]]; then
+		rofi -modi calc -show calc -no-show-match -no-sort -theme huilo-list \
+			-calc-command "echo -n '{result}' | wl-copy" -mesg "Enter — скопировать результат"
+	else
+		notify-send -a Huilo "Калькулятор" "Нужен пакет rofi-calc"
+	fi
+}
+
+wifi() {
+	toggle_close
+	have nmcli || exit 1
+	local list choice ssid
+	notify-send -a Huilo -t 1500 "Wi-Fi" "Поиск сетей…"
+	list=$(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID device wifi list --rescan auto 2>/dev/null |
+		awk -F: '$4 != "" && !seen[$4]++ {
+			icon = ($2 >= 75) ? "network-wireless-signal-excellent" : ($2 >= 50) ? "network-wireless-signal-good" : ($2 >= 25) ? "network-wireless-signal-ok" : "network-wireless-signal-weak"
+			lock = ($3 == "" || $3 == "--") ? "" : "  "
+			mark = ($1 == "*") ? "● " : ""
+			printf "%s%s%s  (%s%%)\0icon\x1f%s\n", mark, $4, lock, $2, icon }')
+	choice=$({
+		printf '%s\n' "$list"
+		row "Настройки сети…" preferences-system-network
+		row "Выключить Wi-Fi" network-wireless-offline
+	} | dmenu "Wi-Fi" list) || exit 0
+	case "$choice" in
+		"Настройки сети…") term huilo-nmtui nmtui; exit 0 ;;
+		"Выключить Wi-Fi") nmcli radio wifi off; exit 0 ;;
+	esac
+	ssid=${choice#● }; ssid=${ssid%  (*}; ssid=${ssid%  }
+	if nmcli -t -f NAME connection show | grep -qxF "$ssid"; then
+		nmcli connection up id "$ssid" >/dev/null 2>&1 && notify-send -a Huilo "Wi-Fi" "Подключено: $ssid" && exit 0
+	fi
+	local -a auth=()
+	if [[ "$choice" == *""* ]]; then
+		local pass
+		pass=$(rofi -dmenu -password -p "Пароль для $ssid" -theme huilo-list -theme-str 'listview { enabled: false; }' </dev/null) || exit 0
+		auth=(password "$pass")
+	fi
+	if nmcli device wifi connect "$ssid" "${auth[@]}" >/dev/null 2>&1; then
+		notify-send -a Huilo "Wi-Fi" "Подключено: $ssid"
+	else
+		notify-send -a Huilo -u critical "Wi-Fi" "Не удалось подключиться к $ssid"
+	fi
+}
+
+hub() {
+	toggle_close
+	local c
+	c=$({
+		row "Приложения" applications-all
+		row "ИИ-помощник — спросить что угодно" system-help
+		row "zapret: обход блокировок" gufw
+		row "Обои" preferences-desktop-wallpaper
+		row "Эквалайзер" com.github.wwmm.easyeffects
+		row "Wi-Fi" network-wireless
+		row "Bluetooth" bluetooth
+		row "Звук: микшер" multimedia-volume-control
+		row "Ночной свет вкл/выкл" weather-clear-night
+		row "Уведомления" preferences-system-notifications
+		row "Ошибки системы (журнал)" org.gnome.Logs
+		row "Собрать журналы для отчёта" logviewer
+		row "Диагностика графики (huilo-doctor)" utilities-system-monitor
+		row "Горячие клавиши" preferences-desktop-keyboard-shortcuts
+		row "Внешний вид GTK" preferences-desktop-theme
+		row "Внешний вид Qt" preferences-desktop-theme
+		row "Arduino" arduino-ide
+		row "NanoPi" computer
+		row "Игры (Atom)" applications-games
+		row "Обновить Huilo" system-software-update
+		row "Установить на диск" system-os-installer
+		row "Питание" system-shutdown
+	} | dmenu "Huilo" list -mesg "SUPER+Space — это меню, SUPER+D — приложения, SUPER+I — помощник") || exit 0
+	case "$c" in
+		Приложения) exec "$0" apps ;;
+		ИИ-помощник*) term huilo-ai huilo-ai ;;
+		zapret*) term huilo-zapret huilo-zapret menu ;;
+		Обои) exec huilo-wallpaper pick ;;
+		Эквалайзер) exec huilo-eq menu ;;
+		Wi-Fi) exec "$0" wifi ;;
+		Bluetooth) setsid -f blueman-manager >/dev/null 2>&1 ;;
+		"Звук: микшер") setsid -f pavucontrol >/dev/null 2>&1 ;;
+		"Ночной свет"*) exec huilo-theme night toggle ;;
+		Уведомления) exec swaync-client -t -sw ;;
+		"Ошибки системы"*) term huilo-logwatch bash -c "$(hold huilo-logwatch show)" ;;
+		"Собрать журналы"*) term huilo-logs bash -c "$(hold huilo-logs)" ;;
+		Диагностика*) term huilo-doctor bash -c "$(hold huilo-doctor)" ;;
+		"Горячие клавиши") term huilo-help less /usr/share/huilo/HOTKEYS.txt ;;
+		"Внешний вид GTK") setsid -f nwg-look >/dev/null 2>&1 ;;
+		"Внешний вид Qt") setsid -f qt6ct >/dev/null 2>&1 ;;
+		Arduino) term huilo-arduino huilo-arduino menu ;;
+		NanoPi) term huilo-nanopi huilo-nanopi menu ;;
+		"Игры (Atom)") term huilo-game bash -c "$(hold huilo-game)" ;;
+		"Обновить Huilo") term huilo-update bash -c "$(hold huilo-update)" ;;
+		"Установить на диск") term huilo-install sudo huilo-install ;;
+		Питание) exec "$0" power ;;
+	esac
+}
+
+case "${1:-apps}" in
+	apps|drun) apps ;;
+	run) run_cmd ;;
+	hub|menu) hub ;;
+	power) power ;;
+	clipboard|clip) clipboard ;;
+	emoji) emoji ;;
+	calc) calc ;;
+	wifi) wifi ;;
+	dmenu) shift; p=${1:-Выбор}; v=${2:-list}; shift 2 2>/dev/null || shift $#; dmenu "$p" "$v" "$@" ;;
+	-h|--help|help) sed -n '2,18p' "$0" ;;
+	*) sed -n '2,18p' "$0" >&2; exit 1 ;;
+esac

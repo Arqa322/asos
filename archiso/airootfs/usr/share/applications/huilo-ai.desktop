@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=AI Assistant
+Name[ru]=ИИ-помощник
+GenericName[ru]=Помощь по Linux простыми словами
+Comment=Ask how to do anything in Huilo; commands run only after you agree
+Comment[ru]=Спросите, как что-то сделать в Huilo; команды выполняются только с вашего согласия
+Exec=kitty --class huilo-float --title huilo-ai -e huilo-ai
+Icon=system-help
+Terminal=false
+Categories=System;Utility;
+Keywords=ai;help;assistant;ии;помощь;помощник;вопрос;

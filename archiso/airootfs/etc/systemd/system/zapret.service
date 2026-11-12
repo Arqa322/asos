@@ -1,0 +1,19 @@
+[Unit]
+Description=zapret DPI bypass (nfqws + Flowseal strategies, Huilo)
+Documentation=https://github.com/bol-van/zapret https://github.com/Flowseal/zapret-discord-youtube
+# nfqws only needs the firewall, not a working connection: start right away
+# instead of waiting for network-online (that delayed zapret by up to 2 minutes)
+Wants=network.target
+After=network.target nftables.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/huilo-zapret run
+ExecStopPost=/usr/local/bin/huilo-zapret fw-down
+Restart=on-failure
+RestartSec=5
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

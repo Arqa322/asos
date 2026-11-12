@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-wallpaper — wallpapers for Hyprland and the sway safe mode
+#
+#    huilo-wallpaper              restore the last wallpaper (used at login)
+#    huilo-wallpaper pick         choose from a grid of previews (SUPER+W)
+#    huilo-wallpaper next | prev | random
+#    huilo-wallpaper set FILE     any image (jpg/png/webp)
+#    huilo-wallpaper list
+#  Your own images: put them in ~/Изображения/Wallpapers (or ~/Pictures/Wallpapers)
+#  Smooth transitions with awww when available, swaybg otherwise.
+# ============================================================================
+set -uo pipefail
+SYS="${HUILO_WALLPAPER_DIR:-/usr/share/backgrounds/huilo}"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/huilo/wallpaper"
+DEFAULT="$SYS/huilo-peaks.jpg"
+mkdir -p "$STATE"
+
+user_dir() {
+	local p
+	p=$(xdg-user-dir PICTURES 2>/dev/null || true)
+	for d in "${p:-}/Wallpapers" "$HOME/Изображения/Wallpapers" "$HOME/Pictures/Wallpapers"; do
+		[[ -d "$d" ]] && { echo "$d"; return; }
+	done
+}
+
+all_files() {
+	# system wallpapers in the curated order of wallpapers.txt, then your own
+	if [[ -r "$SYS/wallpapers.txt" ]]; then
+		awk -F'\t' -v d="$SYS" 'NF { print d "/" $1 }' "$SYS/wallpapers.txt" | while read -r f; do [[ -f "$f" ]] && echo "$f"; done
+	else
+		ls "$SYS"/*.jpg 2>/dev/null
+	fi
+	local u; u=$(user_dir)
+	[[ -n "$u" ]] && find "$u" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort
+	return 0
+}
+
+title_of() { # nice name for the picker
+	local f=$1 b; b=$(basename "$f")
+	local t; t=$(awk -F'\t' -v b="$b" '$1 == b {print $2}' "$SYS/wallpapers.txt" 2>/dev/null)
+	echo "${t:-${b%.*}}"
+}
+
+current() { if [[ -e "$STATE/current" ]]; then readlink -f "$STATE/current"; else echo "$DEFAULT"; fi; }
+
+apply() {
+	local f=$1
+	[[ -f "$f" ]] || { echo "нет файла: $f" >&2; return 1; }
+	ln -sfn "$f" "$STATE/current"
+	# small copy for the launcher (huilo-menu) and the lock screen
+	local thumb="$SYS/thumbs/$(basename "$f")"
+	[[ -f "$thumb" ]] || thumb=$f
+	ln -sfn "$thumb" "$STATE/thumb"
+	if [[ -z "${HUILO_SAFE_SESSION:-}" ]] && command -v awww >/dev/null; then
+		if ! awww query >/dev/null 2>&1; then
+			pkill -x swaybg 2>/dev/null
+			setsid -f awww-daemon >/dev/null 2>&1
+			for _ in $(seq 1 30); do awww query >/dev/null 2>&1 && break; sleep 0.1; done
+		fi
+		if awww img "$f" --transition-type grow --transition-pos 0.85,0.95 --transition-duration 1.2 --transition-fps 60 >/dev/null 2>&1 \
+			|| awww img "$f" >/dev/null 2>&1; then
+			return 0
+		fi
+	fi
+	# fallback (and the CPU-only safe mode): swaybg
+	pkill -x swaybg 2>/dev/null
+	setsid -f swaybg -m fill -i "$f" >/dev/null 2>&1
+}
+
+step() { # +1 / -1 through the list
+	mapfile -t files < <(all_files)
+	[[ ${#files[@]} -gt 0 ]] || return 1
+	local cur i n=${#files[@]} idx=0
+	cur=$(current)
+	for i in "${!files[@]}"; do [[ "${files[$i]}" == "$cur" ]] && idx=$i; done
+	apply "${files[$(( (idx + $1 + n) % n ))]}"
+}
+
+pick() {
+	mapfile -t files < <(all_files)
+	local f thumb choice t cur sel=0 i=0
+	cur=$(current)
+	choice=$(for f in "${files[@]}"; do
+		thumb="$SYS/thumbs/$(basename "$f")"
+		[[ -f "$thumb" ]] || thumb=$f
+		printf '%s\0icon\x1f%s\n' "$(title_of "$f")" "$thumb"
+	done | {
+		for f in "${files[@]}"; do [[ "$f" == "$cur" ]] && sel=$i; i=$((i + 1)); done
+		huilo-menu dmenu "Обои" grid -selected-row "$sel" -mesg "Свои картинки: папка ~/Изображения/Wallpapers"
+	}) || return 0
+	for f in "${files[@]}"; do
+		[[ "$(title_of "$f")" == "$choice" ]] && { apply "$f"; return; }
+	done
+}
+
+case "${1:-restore}" in
+	restore) apply "$(current)" || apply "$DEFAULT" ;;
+	pick) pick ;;
+	next) step 1 ;;
+	prev) step -1 ;;
+	random) mapfile -t files < <(all_files); apply "${files[$(( RANDOM % ${#files[@]} ))]}" ;;
+	set) apply "$(readlink -f "${2:?usage: huilo-wallpaper set FILE}")" ;;
+	list) all_files | while read -r f; do echo "$(title_of "$f") — $f"; done ;;
+	current) current ;;
+	-h|--help) sed -n '2,13p' "$0" ;;
+	*) sed -n '2,13p' "$0"; exit 1 ;;
+esac

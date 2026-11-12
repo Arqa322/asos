@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-zapret — zapret (nfqws) manager for Huilo
+#
+#  Runs bol-van/zapret `nfqws` on Linux using the ready-made strategies of
+#  Flowseal/zapret-discord-youtube. The original Windows *.bat strategies are
+#  converted on the fly: winws `--wf-tcp/--wf-udp` port filters become
+#  nftables NFQUEUE rules, everything else is passed to nfqws unchanged.
+#
+#  Layout:
+#    /opt/zapret/nfqws                      zapret binary
+#    /opt/zapret/flowseal/strategies/*.bat  Flowseal strategies
+#    /opt/zapret/flowseal/{bin,lists}       Flowseal fake payloads and lists
+#    /usr/share/huilo/atom/                  Atom game pack lists
+#    /etc/zapret/huilo.conf                  configuration
+#    /etc/zapret/lists/                     user lists
+#    /run/zapret/                           generated runtime files
+# ============================================================================
+set -euo pipefail
+
+ZAPRET_DIR="${ZAPRET_DIR:-/opt/zapret}"
+FS_DIR="$ZAPRET_DIR/flowseal"
+ATOM_DIR="${ATOM_DIR:-/usr/share/huilo/atom}"
+CONF="${ZAPRET_CONF:-/etc/zapret/huilo.conf}"
+USER_LISTS="${ZAPRET_USER_LISTS:-/etc/zapret/lists}"
+RUN="${ZAPRET_RUN:-/run/zapret}"
+NFT_TABLE="huilo_zapret"
+SERVICE="zapret.service"
+IPSET_PLACEHOLDER="203.0.113.113/32"
+
+# ---------------------------------------------------------------- config ---
+STRATEGY="general"
+GAME_FILTER="all"
+GAME_FILTER_TCP_RANGE="1024-65535"
+GAME_FILTER_UDP_RANGE="1024-65535"
+IPSET_MODE="loaded"
+ATOM_PACK="1"
+QNUM="200"
+NFQWS_EXTRA=""
+# shellcheck source=/dev/null
+[[ -r "$CONF" ]] && . "$CONF"
+
+c_ok=$'\e[32m'; c_err=$'\e[31m'; c_dim=$'\e[2m'; c_b=$'\e[1m'; c_0=$'\e[0m'
+[[ -t 1 ]] || { c_ok=; c_err=; c_dim=; c_b=; c_0=; }
+die()  { echo "${c_err}error:${c_0} $*" >&2; exit 1; }
+info() { echo "${c_ok}::${c_0} $*"; }
+
+need_root() { [[ $EUID -eq 0 ]] || exec sudo -- "$0" "$@"; }
+
+# Set KEY="value" in the config file (creates the key if missing)
+conf_set() {
+	local key=$1 val=$2
+	[[ -f "$CONF" ]] || { mkdir -p "$(dirname "$CONF")"; : >"$CONF"; }
+	if grep -q "^${key}=" "$CONF"; then
+		sed -i "s|^${key}=.*|${key}=\"${val}\"|" "$CONF"
+	else
+		printf '%s="%s"\n' "$key" "$val" >>"$CONF"
+	fi
+	printf -v "$key" '%s' "$val"
+}
+
+# ------------------------------------------------------------ strategies ---
+strategies() {
+	local f
+	for f in "$FS_DIR"/strategies/*.bat; do
+		[[ -e "$f" ]] || continue
+		basename "$f" .bat
+	done
+}
+
+strategy_file() {
+	local f="$FS_DIR/strategies/$1.bat"
+	[[ -f "$f" ]] || die "unknown strategy '$1' (see: huilo-zapret list)"
+	printf '%s' "$f"
+}
+
+game_ports() {
+	# prints "<tcp> <udp>" game filter port ranges; Flowseal uses port 12 as "disabled"
+	local tcp=12 udp=12
+	case "$GAME_FILTER" in
+		all) tcp=$GAME_FILTER_TCP_RANGE; udp=$GAME_FILTER_UDP_RANGE ;;
+		tcp) tcp=$GAME_FILTER_TCP_RANGE ;;
+		udp) udp=$GAME_FILTER_UDP_RANGE ;;
+		off|none|disabled|0|"") ;;
+		*) die "GAME_FILTER must be off|all|tcp|udp (got '$GAME_FILTER')" ;;
+	esac
+	printf '%s %s\n' "$tcp" "$udp"
+}
+
+# Extract the winws command line from a Flowseal .bat and substitute variables.
+# Output: one argument per line.
+strategy_args() {
+	local file=$1 tcp udp
+	read -r tcp udp < <(game_ports)
+	# take everything from the winws.exe line, join "^"-continued lines
+	sed -n '/winws\.exe/,$p' "$file" | tr -d '\r' |
+		sed -e 's/[[:space:]]*\^[[:space:]]*$//' | tr '\n' ' ' |
+		sed -e 's/^.*winws\.exe"[[:space:]]*//' \
+			-e "s|%BIN%|$RUN/bin/|g" \
+			-e "s|%LISTS%|$RUN/lists/|g" \
+			-e "s|%GameFilterTCP%|$tcp|g" \
+			-e "s|%GameFilterUDP%|$udp|g" \
+			-e "s|%GameFilter%|$tcp|g" \
+			-e 's/\^!/!/g' \
+			-e 's/"//g' |
+		tr -s ' \t' '\n' | sed '/^$/d'
+}
+
+# Merge a comma separated list of ports/ranges into non-overlapping nft syntax
+merge_ports() {
+	tr ',' '\n' <<<"$1" | sed '/^$/d' | awk -F- '
+		{ lo=$1+0; hi=(NF>1?$2+0:lo); if (lo>0 && hi>=lo) print lo, hi }' |
+		sort -n -k1,1 -k2,2 | awk '
+		NR==1 { lo=$1; hi=$2; next }
+		{ if ($1 <= hi+1) { if ($2>hi) hi=$2 } else { out=out sep r(lo,hi); sep=", "; lo=$1; hi=$2 } }
+		function r(a,b) { return a==b ? a : a "-" b }
+		END { if (NR) print out sep r(lo,hi) }'
+}
+
+# --------------------------------------------------------------- prepare ---
+clean_list() { # strip comments / blank lines / CR
+	[[ -r "$1" ]] && sed -e 's/\r$//' -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$1" || true
+}
+
+never_empty() { [[ -s "$1" ]] || echo "$2" >"$1"; }
+
+prepare() {
+	[[ -x "$ZAPRET_DIR/nfqws" ]] || die "$ZAPRET_DIR/nfqws not found — image was built without zapret"
+	[[ -d "$FS_DIR" ]] || die "$FS_DIR not found — image was built without Flowseal strategies"
+	rm -rf "$RUN"
+	install -d -m 0755 "$RUN" "$RUN/bin" "$RUN/lists"
+	cp -f "$FS_DIR"/bin/*.bin "$RUN/bin/" 2>/dev/null || true
+
+	local l
+	for l in list-general.txt list-google.txt list-exclude.txt ipset-exclude.txt; do
+		clean_list "$FS_DIR/lists/$l" >"$RUN/lists/$l"
+	done
+
+	# user lists (+ Atom game pack)
+	{
+		clean_list "$USER_LISTS/list-general-user.txt"
+		if [[ "$ATOM_PACK" == 1 ]]; then clean_list "$ATOM_DIR/list-atom-games.txt"; fi
+	} | sort -u >"$RUN/lists/list-general-user.txt"
+	clean_list "$USER_LISTS/list-exclude-user.txt" >"$RUN/lists/list-exclude-user.txt"
+	clean_list "$USER_LISTS/ipset-exclude-user.txt" >"$RUN/lists/ipset-exclude-user.txt"
+	# like Flowseal: never leave a list empty (an empty list means "match everything")
+	never_empty "$RUN/lists/list-general-user.txt" domain.example.abc
+	never_empty "$RUN/lists/list-exclude-user.txt" domain.example.abc
+	never_empty "$RUN/lists/ipset-exclude-user.txt" "$IPSET_PLACEHOLDER"
+	for l in list-general.txt list-google.txt list-exclude.txt; do never_empty "$RUN/lists/$l" domain.example.abc; done
+	never_empty "$RUN/lists/ipset-exclude.txt" "$IPSET_PLACEHOLDER"
+
+	# ipset-all according to IPSET_MODE
+	case "$IPSET_MODE" in
+		none) echo "$IPSET_PLACEHOLDER" >"$RUN/lists/ipset-all.txt" ;;
+		any) : >"$RUN/lists/ipset-all.txt" ;;
+		loaded)
+			{
+				clean_list "$FS_DIR/lists/ipset-all-loaded.txt"
+				if [[ "$ATOM_PACK" == 1 ]]; then clean_list "$ATOM_DIR/ipset-atom-games.txt"; fi
+				clean_list "$USER_LISTS/ipset-user.txt"
+			} | sort -u >"$RUN/lists/ipset-all.txt"
+			# never leave it empty in "loaded" mode (empty = match everything)
+			never_empty "$RUN/lists/ipset-all.txt" "$IPSET_PLACEHOLDER"
+			;;
+		*) die "IPSET_MODE must be none|any|loaded (got '$IPSET_MODE')" ;;
+	esac
+	chmod -R a+rX "$RUN"
+
+	# split strategy into nft ports and nfqws args
+	local file wf_tcp="" wf_udp="" arg
+	file=$(strategy_file "$STRATEGY")
+	: >"$RUN/nfqws.args"
+	while IFS= read -r arg; do
+		case "$arg" in
+			--wf-tcp=*) wf_tcp="${arg#--wf-tcp=}" ;;
+			--wf-udp=*) wf_udp="${arg#--wf-udp=}" ;;
+			--wf-*) ;; # other WinDivert-only options
+			*) printf '%s\n' "$arg" >>"$RUN/nfqws.args" ;;
+		esac
+	done < <(strategy_args "$file")
+	[[ -s "$RUN/nfqws.args" ]] || die "failed to parse strategy $file"
+	merge_ports "$wf_tcp" >"$RUN/ports.tcp"
+	merge_ports "$wf_udp" >"$RUN/ports.udp"
+	echo "$STRATEGY" >"$RUN/strategy"
+}
+
+# -------------------------------------------------------------- firewall ---
+fw_up() {
+	local tcp udp
+	tcp=$(<"$RUN/ports.tcp"); udp=$(<"$RUN/ports.udp")
+	fw_down
+	{
+		echo "table inet $NFT_TABLE {"
+		echo "  chain post {"
+		echo "    type filter hook postrouting priority mangle; policy accept;"
+		echo "    oifname \"lo\" return"
+		echo "    meta mark and 0x40000000 == 0x40000000 return"
+		[[ -n "$tcp" ]] && echo "    tcp dport { $tcp } ct original packets 1-12 queue num $QNUM bypass"
+		[[ -n "$udp" ]] && echo "    udp dport { $udp } ct original packets 1-12 queue num $QNUM bypass"
+		echo "  }"
+		echo "  chain pre {"
+		echo "    type filter hook prerouting priority filter; policy accept;"
+		echo "    iifname \"lo\" return"
+		[[ -n "$tcp" ]] && echo "    tcp sport { $tcp } ct reply packets 1-3 queue num $QNUM bypass"
+		echo "  }"
+		echo "}"
+	} >"$RUN/rules.nft"
+	nft -f "$RUN/rules.nft"
+}
+
+fw_down() { nft delete table inet "$NFT_TABLE" 2>/dev/null || true; }
+
+# --------------------------------------------------------------- service ---
+run() {
+	[[ $EUID -eq 0 ]] || die "run must be started as root (use: systemctl start zapret)"
+	prepare
+	modprobe -q nfnetlink_queue 2>/dev/null || true
+	fw_up
+	local -a args
+	mapfile -t args <"$RUN/nfqws.args"
+	# shellcheck disable=SC2206
+	local -a extra=($NFQWS_EXTRA)
+	info "strategy=$STRATEGY game_filter=$GAME_FILTER ipset=$IPSET_MODE atom=$ATOM_PACK"
+	exec "$ZAPRET_DIR/nfqws" --qnum="$QNUM" "${args[@]}" "${extra[@]}"
+}
+
+is_active() { systemctl is-active --quiet "$SERVICE" 2>/dev/null; }
+
+status() {
+	local st="${c_err}stopped${c_0}"
+	is_active && st="${c_ok}running${c_0}"
+	echo "${c_b}zapret${c_0}        $st ($(systemctl is-enabled "$SERVICE" 2>/dev/null || echo unknown) at boot)"
+	echo "strategy      $STRATEGY"
+	echo "game filter   $GAME_FILTER (tcp $GAME_FILTER_TCP_RANGE / udp $GAME_FILTER_UDP_RANGE)"
+	echo "ipset         $IPSET_MODE"
+	echo "atom pack     $([[ $ATOM_PACK == 1 ]] && echo on || echo off)"
+	[[ -r "$ZAPRET_DIR/VERSION" ]] && echo "${c_dim}$(tr '\n' ' ' <"$ZAPRET_DIR/VERSION")${c_0}"
+	return 0
+}
+
+brief() { # one line for fastfetch / scripts
+	if is_active; then
+		echo "работает · $STRATEGY · game: $GAME_FILTER · atom: $([[ $ATOM_PACK == 1 ]] && echo on || echo off)"
+	elif [[ -x "$ZAPRET_DIR/nfqws" ]]; then
+		echo "выключен (sudo huilo-zapret start)"
+	else
+		echo "не установлен (sudo huilo-groups add zapret)"
+	fi
+}
+
+waybar() {
+	local cls=off icon="󰒄" text tip
+	if is_active; then cls=on; icon="󰒃"; fi
+	text="$icon"
+	tip="zapret: $cls\\nstrategy: $STRATEGY\\ngame filter: $GAME_FILTER\\nipset: $IPSET_MODE\\natom pack: $([[ $ATOM_PACK == 1 ]] && echo on || echo off)\\n\\nЛКМ — меню, ПКМ — вкл/выкл"
+	printf '{"text":"%s","class":"%s","alt":"%s","tooltip":"%s"}\n' "$text" "$cls" "$cls" "$tip"
+}
+
+restart_if_active() { if is_active; then systemctl restart "$SERVICE"; info "zapret restarted"; fi; }
+
+check() {
+	local url code
+	local -a urls=(
+		https://discord.com https://www.youtube.com https://i.ytimg.com
+		https://store.steampowered.com https://www.roblox.com https://www.cloudflare.com
+	)
+	for url in "${urls[@]}"; do
+		code=$(curl -s -o /dev/null -m 8 -w '%{http_code}' "$url" || true)
+		if [[ "$code" =~ ^[23] ]]; then
+			printf '%s%-36s OK (%s)%s\n' "$c_ok" "$url" "$code" "$c_0"
+		else
+			printf '%s%-36s FAIL (%s)%s\n' "$c_err" "$url" "${code:-000}" "$c_0"
+		fi
+	done
+}
+
+# Try every strategy and report which ones pass `check`
+autotest() {
+	need_root autotest
+	local s orig=$STRATEGY ok
+	for s in $(strategies); do
+		conf_set STRATEGY "$s"
+		systemctl restart "$SERVICE"; sleep 3
+		ok=$(check | grep -c ' OK ' || true)
+		printf '%-32s %s/6\n' "$s" "$ok"
+	done
+	conf_set STRATEGY "$orig"; systemctl restart "$SERVICE"
+}
+
+menu() {
+	command -v dialog >/dev/null || die "dialog is not installed"
+	local choice
+	while true; do
+		choice=$(dialog --stdout --title "Huilo zapret" --menu \
+			"Статус: $(is_active && echo 'работает' || echo 'остановлен') | стратегия: $STRATEGY" 18 70 10 \
+			toggle "Включить / выключить" \
+			strategy "Выбрать стратегию Flowseal" \
+			game "Game Filter: $GAME_FILTER" \
+			ipset "IPSet Filter: $IPSET_MODE" \
+			atom "Atom game pack: $([[ $ATOM_PACK == 1 ]] && echo on || echo off)" \
+			check "Проверить доступность сайтов" \
+			edit "Редактировать свой список доменов" \
+			quit "Выход") || break
+		case "$choice" in
+			toggle) toggle ;;
+			strategy)
+				local -a items=() s
+				for s in $(strategies); do items+=("$s" ""); done
+				s=$(dialog --stdout --default-item "$STRATEGY" --menu "Стратегия" 22 60 16 "${items[@]}") &&
+					set_strategy "$s"
+				;;
+			game)
+				s=$(dialog --stdout --default-item "$GAME_FILTER" --menu "Game Filter" 12 50 4 \
+					off "выключен" all "TCP + UDP" tcp "только TCP" udp "только UDP") && set_game "$s"
+				;;
+			ipset)
+				s=$(dialog --stdout --default-item "$IPSET_MODE" --menu "IPSet Filter" 12 60 3 \
+					loaded "список Flowseal + Atom" any "любые IP (агрессивно)" none "выключен") && set_ipset "$s"
+				;;
+			atom) set_atom "$([[ $ATOM_PACK == 1 ]] && echo off || echo on)" ;;
+			check) clear; check; read -rp "Enter..." _ ;;
+			edit) "${EDITOR:-nano}" "$USER_LISTS/list-general-user.txt"; restart_if_active ;;
+			quit) break ;;
+		esac
+	done
+	clear
+}
+
+toggle() {
+	if is_active; then
+		systemctl disable --now "$SERVICE"; info "zapret stopped"
+	else
+		systemctl enable --now "$SERVICE"; info "zapret started ($STRATEGY)"
+	fi
+}
+
+set_strategy() { strategy_file "$1" >/dev/null; conf_set STRATEGY "$1"; info "strategy: $1"; restart_if_active; }
+set_game() {
+	case "$1" in off|all|tcp|udp) ;; *) die "usage: huilo-zapret game off|all|tcp|udp" ;; esac
+	conf_set GAME_FILTER "$1"; info "game filter: $1"; restart_if_active
+}
+set_ipset() {
+	case "$1" in none|any|loaded) ;; *) die "usage: huilo-zapret ipset none|any|loaded" ;; esac
+	conf_set IPSET_MODE "$1"; info "ipset: $1"; restart_if_active
+}
+set_atom() {
+	case "$1" in on|1) conf_set ATOM_PACK 1 ;; off|0) conf_set ATOM_PACK 0 ;; *) die "usage: huilo-zapret atom on|off" ;; esac
+	info "atom pack: $1"; restart_if_active
+}
+
+usage() {
+	cat <<EOF
+${c_b}huilo-zapret${c_0} — zapret + Flowseal strategies for Huilo
+
+  status                 show state (default)
+  start | stop | restart control the service
+  enable | disable       autostart at boot
+  toggle                 start/stop + enable/disable
+  menu                   interactive TUI menu
+  list                   list Flowseal strategies
+  set <strategy>         select strategy (e.g. general-alt)
+  game off|all|tcp|udp   Flowseal Game Filter
+  ipset none|any|loaded  Flowseal IPSet Filter
+  atom on|off            Atom game pack (games hostlist + ipset)
+  check                  test access to Discord/YouTube/Steam/...
+  autotest               try all strategies, show results
+  show                   print generated nfqws args and nft rules
+  waybar                 JSON status for waybar
+  brief                  one-line status
+
+Config: $CONF   User lists: $USER_LISTS
+EOF
+}
+
+cmd=${1:-status}; shift || true
+case "$cmd" in
+	status) status ;;
+	start|stop|restart) need_root "$cmd"; systemctl "$cmd" "$SERVICE"; status ;;
+	enable|disable) need_root "$cmd"; systemctl "$cmd" --now "$SERVICE"; status ;;
+	toggle) need_root toggle; toggle ;;
+	menu) need_root menu; menu ;;
+	list) for s in $(strategies); do [[ $s == "$STRATEGY" ]] && echo "* $s" || echo "  $s"; done ;;
+	set) need_root set "$@"; set_strategy "${1:?strategy name required}" ;;
+	game) need_root game "$@"; set_game "${1:-}" ;;
+	ipset) need_root ipset "$@"; set_ipset "${1:-}" ;;
+	atom) need_root atom "$@"; set_atom "${1:-}" ;;
+	check) check ;;
+	autotest) autotest ;;
+	show)
+		need_root show
+		[[ -s "$RUN/nfqws.args" ]] || prepare
+		echo "${c_b}# nfqws${c_0}"; echo "$ZAPRET_DIR/nfqws --qnum=$QNUM $(tr '\n' ' ' <"$RUN/nfqws.args")"
+		echo "${c_b}# tcp ports:${c_0} $(<"$RUN/ports.tcp")"; echo "${c_b}# udp ports:${c_0} $(<"$RUN/ports.udp")"
+		;;
+	prepare) need_root prepare; prepare ;;
+	run) run ;;
+	fw-up) need_root fw-up; fw_up ;;
+	fw-down) need_root fw-down; fw_down ;;
+	waybar) waybar ;;
+	brief) brief ;;
+	-h|--help|help) usage ;;
+	*) usage; exit 1 ;;
+esac

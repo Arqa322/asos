@@ -1,0 +1,5 @@
+-- Your personal Hyprland settings (Lua). Loaded at the end of hyprland.lua.
+-- Examples:
+-- hl.monitor({ output = "DP-1", mode = "2560x1440@165", position = "0x0", scale = 1 })
+-- hl.bind("SUPER + T", hl.dsp.exec_cmd("telegram-desktop"))
+-- hl.config({ input = { sensitivity = -0.3 } })

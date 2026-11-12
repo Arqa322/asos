@@ -1,0 +1,20 @@
+# ============================================================
+#  AUR packages built by scripts/build-aur.sh into a local
+#  repository before mkarchiso runs. A package that fails to
+#  build is skipped (the ISO is still produced without it).
+#  Section headers with a [tag] belong to optional groups
+#  (same tags as packages.x86_64, see scripts/pkg-select.sh).
+# ============================================================
+
+# ---------- [arduino] Arduino IDE 2, serial terminals, MicroPython ----------
+arduino-ide-bin
+tio
+cutecom
+mpremote
+
+# ---------- [nanopi] Rockchip maskrom / Allwinner FEL flashing ----------
+rkdeveloptool-git
+xfel
+
+# ---------- [aur] AUR helper ----------
+yay-bin

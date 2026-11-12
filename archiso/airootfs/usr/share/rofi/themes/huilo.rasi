@@ -1,0 +1,139 @@
+/* generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy) */
+/* Huilo launcher theme for rofi. Colours: theme/palette.toml
+   Variants: huilo-list (menus), huilo-power, huilo-grid (wallpapers) */
+* {
+    ink0: #0b0d12;  ink1: #11141b;  ink2: #181c25;  ink3: #222734;  ink4: #2e3445;
+    mist: #8a91a5;  fog: #b9bfcc;    snow: #ece7dc;
+    amber: #f2a33a; honey: #ffc978; ember: #ff6b4a; berry: #f0566a; pine: #8bc78f;
+    panel: rgba(17, 20, 27, 0.94);
+    glass: rgba(11, 13, 18, 0.55);
+    pick:  rgba(242, 163, 58, 0.16);
+
+    font: "Inter 11";
+    background-color: transparent;
+    text-color: @snow;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+}
+
+window {
+    location: center;
+    anchor: center;
+    width: 780px;
+    border: 1px;
+    border-color: @ink4;
+    border-radius: 20px;
+    background-color: @panel;
+    cursor: "default";
+}
+
+mainbox {
+    orientation: horizontal;
+    children: [ "imagebox", "listbox" ];
+}
+
+/* left: the current wallpaper (huilo-menu passes the picture) */
+imagebox {
+    expand: false;
+    width: 250px;
+    padding: 20px;
+    border-radius: 20px 0px 0px 20px;
+    background-color: @ink2;
+    background-image: url("/usr/share/backgrounds/huilo/thumbs/huilo-peaks.jpg", height);
+    orientation: vertical;
+    children: [ "textbox-brand", "dummy", "mode-switcher" ];
+}
+textbox-brand {
+    expand: false;
+    content: "Huilo";
+    font: "Inter Bold 20";
+    text-color: @snow;
+    padding: 6px 12px;
+    border-radius: 12px;
+    background-color: @glass;
+    horizontal-align: 0.0;
+}
+mode-switcher {
+    spacing: 8px;
+    orientation: vertical;
+    expand: false;
+}
+button {
+    padding: 9px 12px;
+    border-radius: 12px;
+    background-color: @glass;
+    text-color: @fog;
+    cursor: pointer;
+    horizontal-align: 0.0;
+}
+button selected {
+    background-color: @amber;
+    text-color: @ink0;
+}
+
+/* right: search + list */
+listbox {
+    padding: 20px;
+    spacing: 14px;
+    orientation: vertical;
+    children: [ "inputbar", "message", "listview" ];
+}
+inputbar {
+    padding: 12px 16px;
+    spacing: 12px;
+    border-radius: 14px;
+    background-color: @ink2;
+    border: 1px;
+    border-color: @ink4;
+    children: [ "textbox-search", "entry" ];
+}
+textbox-search {
+    expand: false;
+    content: "";
+    font: "JetBrainsMono Nerd Font 12";
+    text-color: @amber;
+    vertical-align: 0.5;
+}
+prompt { text-color: @amber; font: "Inter SemiBold 11"; }
+entry {
+    placeholder: "Поиск…";
+    placeholder-color: @mist;
+    cursor: text;
+    vertical-align: 0.5;
+}
+
+message {
+    padding: 10px 14px;
+    border-radius: 12px;
+    background-color: @ink2;
+}
+textbox { text-color: @fog; vertical-align: 0.5; }
+
+listview {
+    lines: 8;
+    columns: 1;
+    spacing: 4px;
+    cycle: true;
+    dynamic: true;
+    scrollbar: false;
+    fixed-height: true;
+    layout: vertical;
+}
+element {
+    padding: 9px 12px;
+    spacing: 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    children: [ "element-icon", "element-text" ];
+}
+element normal.normal, element alternate.normal { background-color: transparent; text-color: @fog; }
+element normal.active, element alternate.active { background-color: transparent; text-color: @honey; }
+element normal.urgent, element alternate.urgent { background-color: transparent; text-color: @berry; }
+element selected.normal { background-color: @pick; text-color: @snow; }
+element selected.active { background-color: @pick; text-color: @honey; }
+element selected.urgent { background-color: @berry; text-color: @ink0; }
+element-icon { size: 26px; cursor: inherit; vertical-align: 0.5; }
+element-text { text-color: inherit; cursor: inherit; vertical-align: 0.5; highlight: bold #f2a33a; }
+
+error-message { padding: 18px; border-radius: 16px; background-color: @panel; }

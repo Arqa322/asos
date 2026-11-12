@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-logs — detailed log collection for Huilo
+#
+#    huilo-logs                    collect everything into ~/huilo-logs-<host>-<date>.tar.gz
+#    huilo-logs --redact           ... with user/host names, IP and MAC addresses,
+#                                  serial numbers masked (safe to share)
+#    huilo-logs --since "2 days ago"   journal window (default: current + previous boot)
+#    huilo-logs --summary          only print the short summary, no archive
+#    sudo huilo-logs               also root-only data (dmidecode, SMART, full dmesg)
+#
+#  Sections: summary, journal (errors/warnings/full, previous boot), kernel,
+#  failed units, coredumps, boot timing, hardware, disks, network, graphics
+#  session (Hyprland/sway/huilo-session), audio, zapret, pacman.
+# ============================================================================
+set -uo pipefail
+REDACT=0 SINCE="" SUMMARY_ONLY=0 OUT_DIR="${HOME:-/tmp}"
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--redact) REDACT=1 ;;
+		--since) SINCE=${2:?}; shift ;;
+		--summary) SUMMARY_ONLY=1 ;;
+		-o|--out-dir) OUT_DIR=${2:?}; shift ;;
+		-h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+		*) echo "unknown option $1" >&2; exit 1 ;;
+	esac
+	shift
+done
+
+host=$(cat /etc/hostname 2>/dev/null || hostname)
+stamp=$(date +%Y%m%d-%H%M%S)
+name="huilo-logs-$host-$stamp"
+[[ $REDACT == 1 ]] && name="huilo-logs-redacted-$stamp"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+D="$tmp/$name"
+mkdir -p "$D"/{system,hardware,network,desktop,audio,zapret,pacman}
+have() { command -v "$1" >/dev/null 2>&1; }
+run() { # run FILE CMD... : command output (and errors) into a file, never fail
+	local f=$1; shift
+	{ echo "\$ $*"; "$@"; } >"$D/$f" 2>&1 || true
+}
+J=(journalctl --no-pager -o short-iso-precise)
+win=(-b); [[ -n "$SINCE" ]] && win=(--since "$SINCE")
+step() { printf '  \e[36m•\e[0m %s\n' "$1"; }
+
+echo -e "\e[1mHuilo: сбор журналов\e[0m ($([[ $EUID -eq 0 ]] && echo 'root' || echo 'пользователь — для полного отчёта: sudo huilo-logs'))"
+
+# ------------------------------------------------------------ summary ---
+summary() {
+	local errs crit warn prev_errs failed cores
+	errs=$("${J[@]}" "${win[@]}" -p 3 -q 2>/dev/null | wc -l)
+	crit=$("${J[@]}" "${win[@]}" -p 2 -q 2>/dev/null | wc -l)
+	warn=$("${J[@]}" "${win[@]}" -p 4 -q 2>/dev/null | wc -l)
+	prev_errs=$("${J[@]}" -b -1 -p 3 -q 2>/dev/null | wc -l)
+	failed=$(systemctl --failed --no-legend --plain 2>/dev/null | grep -c . || true)
+	cores=$(coredumpctl list --no-legend "${win[@]}" 2>/dev/null | grep -c . || true)
+	echo "Huilo log report — $(date '+%F %T')"
+	echo "система:        $(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-?}")  ·  ядро $(uname -r)"
+	echo "сборка:         $(tr '\n' ' ' </usr/share/huilo/build-info 2>/dev/null || echo '—')"
+	echo "работает:       $(uptime -p 2>/dev/null)"
+	echo "виртуализация:  $(systemd-detect-virt 2>/dev/null || echo none)"
+	echo "режим графики:  $(cat ~/.local/state/huilo/session/last-ok 2>/dev/null || echo '—')"
+	echo
+	echo "за период ($([[ -n "$SINCE" ]] && echo "с $SINCE" || echo 'текущая загрузка')):"
+	echo "  критических (crit/alert/emerg): $crit"
+	echo "  ошибок (err и выше):            $errs"
+	echo "  предупреждений (warning и выше): $warn"
+	echo "  упавших служб:                  $failed"
+	echo "  аварийных дампов (coredump):    $cores"
+	echo "  ошибок в прошлой загрузке:      $prev_errs"
+	echo
+	echo "самые частые источники ошибок:"
+	"${J[@]}" "${win[@]}" -p 3 -o json 2>/dev/null \
+		| jq -r '(.SYSLOG_IDENTIFIER // ._COMM // "?")' 2>/dev/null | sort | uniq -c | sort -rn | head -n 8 | sed 's/^/  /'
+	echo
+	echo "последние 15 ошибок:"
+	"${J[@]}" "${win[@]}" -p 3 -o short-monotonic -q 2>/dev/null | tail -n 15 | cut -c1-220 | sed 's/^/  /'
+	if [[ $failed -gt 0 ]]; then
+		echo; echo "упавшие службы:"; systemctl --failed --no-legend --plain 2>/dev/null | sed 's/^/  /'
+	fi
+}
+
+if [[ $SUMMARY_ONLY == 1 ]]; then summary; exit 0; fi
+
+step "сводка";                summary >"$D/00-summary.txt" 2>&1
+step "журнал: ошибки";        run system/journal-errors.txt "${J[@]}" "${win[@]}" -p 3
+step "журнал: предупреждения"; run system/journal-warnings.txt "${J[@]}" "${win[@]}" -p 4
+step "журнал: полностью";     "${J[@]}" "${win[@]}" 2>/dev/null | gzip -6 >"$D/system/journal-full.txt.gz"
+step "прошлая загрузка";      run system/journal-previous-boot-errors.txt "${J[@]}" -b -1 -p 3
+run system/journal-previous-boot-tail.txt bash -c "journalctl --no-pager -b -1 -n 300 2>/dev/null"
+run system/boots.txt journalctl --list-boots --no-pager
+step "ядро";                  run system/kernel.txt "${J[@]}" -k "${win[@]}"
+[[ $EUID -eq 0 ]] && run system/dmesg.txt dmesg -T
+step "службы";                run system/failed-units.txt systemctl --failed --all --no-pager
+run system/failed-user-units.txt systemctl --user --failed --no-pager
+run system/units-state.txt systemctl list-units --type=service --no-pager --all
+step "аварийные дампы";       run system/coredumps.txt coredumpctl list --no-pager "${win[@]}"
+coredumpctl list --no-legend "${win[@]}" 2>/dev/null | tail -n 3 | awk '{print $5}' | while read -r pid; do
+	[[ -n "$pid" ]] && coredumpctl info "$pid" --no-pager >"$D/system/coredump-$pid.txt" 2>&1
+done
+step "загрузка системы";      run system/boot-time.txt bash -c 'systemd-analyze; echo; systemd-analyze blame | head -n 40; echo; systemd-analyze critical-chain'
+run system/os.txt bash -c 'cat /etc/os-release; echo; uname -a; echo; cat /proc/cmdline; echo; cat /usr/share/huilo/build-info 2>/dev/null; echo; id'
+
+step "железо"
+run hardware/pci.txt lspci -nnk
+run hardware/usb.txt lsusb -tv
+run hardware/cpu.txt lscpu
+run hardware/memory.txt free -h
+have sensors && run hardware/sensors.txt sensors
+have inxi && run hardware/inxi.txt inxi -Fxxz --no-host
+[[ $EUID -eq 0 ]] && have dmidecode && run hardware/dmidecode.txt dmidecode
+step "диски"
+run hardware/disks.txt bash -c 'lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,MOUNTPOINTS,MODEL,TRAN; echo; df -hT -x tmpfs -x devtmpfs; echo; findmnt --real'
+if [[ $EUID -eq 0 ]] && have smartctl; then
+	for d in $(lsblk -dpno NAME -e 7,11); do smartctl -H -A "$d" >"$D/hardware/smart-$(basename "$d").txt" 2>&1; done
+fi
+
+step "сеть"
+run network/addresses.txt ip -br address
+run network/routes.txt ip route
+have nmcli && run network/networkmanager.txt bash -c 'nmcli general; echo; nmcli device; echo; nmcli connection show'
+run network/dns.txt cat /etc/resolv.conf
+run network/listening.txt ss -tulpn
+
+step "графика и сеанс"
+st="${XDG_STATE_HOME:-$HOME/.local/state}/huilo"
+[[ -d "$st" ]] && cp -r "$st" "$D/desktop/huilo-state" 2>/dev/null
+have huilo-doctor && huilo-doctor "$D/desktop/huilo-doctor.txt" >/dev/null 2>&1
+rt="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+for f in $(ls -t "$rt"/hypr/*/hyprland.log 2>/dev/null | head -n 2); do cp "$f" "$D/desktop/hyprland-$(basename "$(dirname "$f")").log"; done
+for f in $(ls -t ~/.cache/hyprland/hyprlandCrashReport*.txt ~/.local/share/hyprland/hyprlandCrashReport*.txt 2>/dev/null | head -n 3); do cp "$f" "$D/desktop/"; done
+run desktop/user-journal.txt journalctl --user --no-pager -b -p 4
+run desktop/env.txt bash -c 'env | grep -E "^(XDG_|WAYLAND|HYPR|DISPLAY|DESKTOP|SESSION|QT_|GDK_|MOZ_|ELECTRON)" | sort'
+
+step "звук"
+have wpctl && run audio/wpctl.txt wpctl status
+run audio/pipewire.txt journalctl --user --no-pager -b -u pipewire -u wireplumber -u pipewire-pulse
+have easyeffects && run audio/easyeffects-presets.txt ls -la ~/.local/share/easyeffects/output
+
+step "zapret"
+have huilo-zapret && run zapret/status.txt huilo-zapret status
+run zapret/journal.txt "${J[@]}" -u zapret "${win[@]}"
+[[ -r /etc/zapret/huilo.conf ]] && cp /etc/zapret/huilo.conf "$D/zapret/"
+
+step "пакеты"
+run pacman/recent.txt tail -n 400 /var/log/pacman.log
+run pacman/foreign.txt pacman -Qm
+run pacman/count.txt bash -c 'pacman -Q | wc -l'
+
+# ----------------------------------------------------------- redaction ---
+if [[ $REDACT == 1 ]]; then
+	step "обезличивание"
+	user=$(id -un)
+	find "$D" -type f ! -name '*.gz' -print0 | xargs -0 -r sed -i -E \
+		-e "s/\\b$host\\b/HOSTNAME/g" -e "s/\\b$user\\b/USER/g" \
+		-e 's/\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b/XX:XX:XX:XX:XX:XX/g' \
+		-e 's/\b([0-9]{1,3}\.){3}[0-9]{1,3}\b/x.x.x.x/g' \
+		-e 's/\b([0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b/IPv6/g' \
+		-e 's/(Serial Number|SerialNumber|serial|Serial)([:=][[:space:]]*)[^[:space:]]+/\1\2REDACTED/g'
+	# the full journal is compressed: redact it too
+	gzip -dc "$D/system/journal-full.txt.gz" | sed -E -e "s/\\b$host\\b/HOSTNAME/g" -e "s/\\b$user\\b/USER/g" \
+		-e 's/\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b/XX:XX:XX:XX:XX:XX/g' -e 's/\b([0-9]{1,3}\.){3}[0-9]{1,3}\b/x.x.x.x/g' \
+		| gzip -6 >"$D/system/journal-full.redacted.gz" && mv "$D/system/journal-full.redacted.gz" "$D/system/journal-full.txt.gz"
+fi
+
+mkdir -p "$OUT_DIR"
+archive="$OUT_DIR/$name.tar.gz"
+tar -C "$tmp" -czf "$archive" "$name"
+echo
+sed -n '1,22p' "$D/00-summary.txt"
+echo
+echo -e "\e[1;32mГотово:\e[0m $archive ($(du -h "$archive" | cut -f1))"
+[[ $REDACT == 1 ]] || echo "Для отправки другим людям используйте: huilo-logs --redact"
+have notify-send && [[ -n "${WAYLAND_DISPLAY:-}" ]] && notify-send -a Huilo "Журналы собраны" "$archive" 2>/dev/null
+exit 0

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Add a user to the Huilo default groups (skips groups that do not exist).
+set -euo pipefail
+user=${1:?usage: huilo-user-groups <user>}
+for g in wheel audio video input storage network uucp lock systemd-journal docker libvirt kvm wireshark gamemode; do
+	getent group "$g" >/dev/null && usermod -aG "$g" "$user" || true
+done

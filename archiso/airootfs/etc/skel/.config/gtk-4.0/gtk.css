@@ -1,0 +1,49 @@
+/* generated from theme/templates by scripts/make-theme.py — in the Huilo repository edit the template; on your computer edit this file freely (huilo-update keeps a .bak copy) */
+/* Huilo accents for GTK 4 / libadwaita apps. Colours: theme/palette.toml */
+@define-color accent_color #ffc978;
+@define-color accent_bg_color #f2a33a;
+@define-color accent_fg_color #0b0d12;
+@define-color window_bg_color #11141b;
+@define-color window_fg_color #ece7dc;
+@define-color view_bg_color #11141b;
+@define-color view_fg_color #ece7dc;
+@define-color headerbar_bg_color #181c25;
+@define-color headerbar_fg_color #ece7dc;
+@define-color headerbar_backdrop_color #11141b;
+@define-color headerbar_border_color #2e3445;
+@define-color sidebar_bg_color #181c25;
+@define-color sidebar_fg_color #ece7dc;
+@define-color card_bg_color rgba(236, 231, 220, 0.04);
+@define-color card_fg_color #ece7dc;
+@define-color popover_bg_color #181c25;
+@define-color popover_fg_color #ece7dc;
+@define-color dialog_bg_color #181c25;
+@define-color dialog_fg_color #ece7dc;
+@define-color destructive_bg_color #f0566a;
+@define-color success_color #8bc78f;
+@define-color warning_color #ffc978;
+@define-color error_color #f0566a;
+
+/* libadwaita 1.6+ reads CSS variables */
+:root {
+  --accent-color: #ffc978;
+  --accent-bg-color: #f2a33a;
+  --accent-fg-color: #0b0d12;
+  --window-bg-color: #11141b;
+  --window-fg-color: #ece7dc;
+  --view-bg-color: #11141b;
+  --view-fg-color: #ece7dc;
+  --headerbar-bg-color: #181c25;
+  --headerbar-fg-color: #ece7dc;
+  --sidebar-bg-color: #181c25;
+  --sidebar-fg-color: #ece7dc;
+  --popover-bg-color: #181c25;
+  --popover-fg-color: #ece7dc;
+  --dialog-bg-color: #181c25;
+  --dialog-fg-color: #ece7dc;
+  --card-bg-color: rgba(236, 231, 220, 0.04);
+  --destructive-bg-color: #f0566a;
+  --success-color: #8bc78f;
+  --warning-color: #ffc978;
+  --error-color: #f0566a;
+}

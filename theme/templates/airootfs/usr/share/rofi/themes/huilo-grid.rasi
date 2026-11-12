@@ -1,0 +1,20 @@
+/* Huilo wallpaper picker: a grid of previews */
+@import "huilo"
+
+window   { width: 980px; }
+mainbox  { orientation: vertical; children: [ "listbox" ]; }
+listbox  { padding: 20px; spacing: 16px; }
+inputbar { children: [ "prompt", "entry" ]; }
+listview { columns: 3; lines: 2; spacing: 14px; flow: horizontal; fixed-columns: true; }
+element  {
+    orientation: vertical;
+    padding: 10px;
+    spacing: 8px;
+    border-radius: 16px;
+    background-color: @ink2;
+    children: [ "element-icon", "element-text" ];
+}
+element-icon { size: 170px; horizontal-align: 0.5; }
+element-text { horizontal-align: 0.5; font: "@{font.ui} 10"; }
+element normal.normal, element alternate.normal { background-color: @ink2; text-color: @fog; }
+element selected.normal { background-color: @pick; text-color: @snow; border: 2px; border-color: @amber; }

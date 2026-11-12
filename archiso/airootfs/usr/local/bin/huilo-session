@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-session — start the graphical session on tty1 with automatic fallbacks
+#
+#  Instead of an endless crash loop (Hyprland logo -> black screen) it tries
+#  graphics modes one after another until one works, remembers the working
+#  one, and drops to the console with an explanation if none does.
+#
+#  Modes:
+#    hyprland           Hyprland (start-hyprland supervisor), normal hardware
+#    hyprland-vm        Hyprland tuned for virtual GPUs (VirtualBox/VMware/QEMU)
+#    hyprland-legacy    + legacy (non-atomic) modesetting
+#    hyprland-software  + software rendering (llvmpipe), slow but needs no 3D
+#    sway-software      safe desktop: sway with the pixman renderer, no GPU needed
+#    console            no graphics
+#
+#  Force a mode:  kernel parameter  huilo.session=<mode>
+#                 or file           ~/.config/huilo/session  (MODE=<mode>)
+#                 or command        huilo-session --set <mode> | --reset
+#  Logs:          ~/.local/state/huilo/session/
+# ============================================================================
+set -uo pipefail
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/huilo/session"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/huilo/session"
+mkdir -p "$STATE"
+LAST_OK="$STATE/last-ok"
+QUICK_FAIL=${HUILO_QUICK_FAIL:-45}      # a compositor that exits sooner than this did not work
+READY_AFTER=${HUILO_READY_AFTER:-25}     # seconds before checking that the compositor has outputs
+
+virt=$(systemd-detect-virt --vm 2>/dev/null || true)
+[[ -n "$virt" && "$virt" != none ]] || virt=none
+
+all_modes() {
+	if [[ "$virt" != none ]]; then
+		echo hyprland-vm hyprland-legacy hyprland-software sway-software console
+	else
+		echo hyprland hyprland-software sway-software console
+	fi
+}
+
+say() { echo -e "\e[1;36m[huilo-session]\e[0m $*"; echo "$(date '+%F %T') $*" >>"$STATE/session.log"; logger -t huilo-session -- "$*" 2>/dev/null || true; }
+
+case "${1:-}" in
+	--set)
+		[[ -n "${2:-}" ]] || { echo "usage: huilo-session --set <mode>"; exit 1; }
+		mkdir -p "$(dirname "$CONF")"; echo "MODE=$2" >"$CONF"; echo "mode $2 will be used at next login"; exit 0 ;;
+	--reset)
+		rm -f "$CONF" "$LAST_OK"; echo "automatic mode selection restored"; exit 0 ;;
+	--status)
+		echo "virtualisation: $virt"; echo "modes: $(all_modes)"
+		echo "forced: $(sed -n 's/^MODE=//p' "$CONF" 2>/dev/null || true)"; echo "last working: $(cat "$LAST_OK" 2>/dev/null || true)"
+		echo "logs: $STATE"; exit 0 ;;
+	-h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+esac
+
+# ------------------------------------------------------------- mode order ---
+forced=$(grep -o 'huilo\.session=[a-z-]*' /proc/cmdline 2>/dev/null | head -n1 | cut -d= -f2 || true)
+grep -qw huilo.nogui /proc/cmdline && forced=console
+[[ -n "$forced" ]] || forced=$(sed -n 's/^MODE=//p' "$CONF" 2>/dev/null | head -n1 || true)
+
+read -r -a MODES <<<"$(all_modes)"
+if [[ -n "$forced" ]]; then
+	MODES=("$forced")
+elif [[ -s "$LAST_OK" ]]; then
+	# start from the last mode that worked
+	last=$(cat "$LAST_OK"); rest=()
+	for m in "${MODES[@]}"; do [[ "$m" == "$last" ]] && continue; rest+=("$m"); done
+	MODES=("$last" "${rest[@]}")
+fi
+
+# --------------------------------------------------------- run one mode ---
+compositor_ready() { # $1 = mode
+	local rt=${XDG_RUNTIME_DIR:-/run/user/$(id -u)} sig sock
+	case "$1" in
+		hyprland*)
+			sig=$(ls -t "$rt/hypr" 2>/dev/null | head -n1)
+			[[ -n "$sig" ]] && HYPRLAND_INSTANCE_SIGNATURE=$sig hyprctl -j monitors 2>/dev/null | grep -q '"name"' ;;
+		sway*)
+			sock=$(ls -t "$rt"/sway-ipc.*.sock 2>/dev/null | head -n1)
+			[[ -n "$sock" ]] && SWAYSOCK=$sock swaymsg -t get_outputs 2>/dev/null | grep -q '"name"' ;;
+	esac
+}
+
+run_mode() { # returns 0 = session ran and ended normally, 1 = mode failed
+	local mode=$1 log="$STATE/$1.log" cmd=() fifo pid start now crashes=0 ready=0 line
+	local -a envs=()
+	case "$mode" in
+		hyprland)          cmd=(start-hyprland) ;;
+		hyprland-vm)       cmd=(start-hyprland); envs=(AQ_NO_MODIFIERS=1) ;;
+		hyprland-legacy)   cmd=(start-hyprland); envs=(AQ_NO_MODIFIERS=1 AQ_NO_ATOMIC=1) ;;
+		hyprland-software) cmd=(start-hyprland); envs=(AQ_NO_MODIFIERS=1 AQ_NO_ATOMIC=1 LIBGL_ALWAYS_SOFTWARE=1) ;;
+		sway-software)     cmd=(sway --unsupported-gpu -c /usr/share/huilo/sway/config)
+		                   envs=(WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 LIBGL_ALWAYS_SOFTWARE=1 HUILO_SAFE_SESSION=1 XDG_CURRENT_DESKTOP=sway) ;;
+		console)           return 2 ;;
+		*) say "неизвестный режим '$mode'"; return 1 ;;
+	esac
+	command -v "${cmd[0]}" >/dev/null || { [[ "${cmd[0]}" == start-hyprland ]] && cmd=(Hyprland); }
+	command -v "${cmd[0]}" >/dev/null || { say "$mode: ${cmd[0]} не установлен"; return 1; }
+
+	say "запуск режима: $mode"
+	fifo=$(mktemp -u "$STATE/out.XXXXXX"); mkfifo "$fifo"
+	env "${envs[@]}" "${cmd[@]}" >"$fifo" 2>&1 &
+	pid=$!
+	exec 3<"$fifo"; rm -f "$fifo"
+	: >"$log"
+	start=$(date +%s)
+
+	while kill -0 "$pid" 2>/dev/null; do
+		if IFS= read -r -t 1 line <&3; then
+			printf '%s\n' "$line" >>"$log"
+			# start-hyprland restarts a crashed Hyprland in safe mode (without our
+			# config); a crash before the session is up means this mode does not work
+			if [[ "$line" == *"exit not-cleanly"* ]]; then
+				crashes=$((crashes + 1))
+				if (( ready == 0 )); then
+					say "$mode: Hyprland падает при запуске — следующий режим"
+					kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
+					wait "$pid" 2>/dev/null; exec 3<&-; return 1
+				fi
+			fi
+		fi
+		now=$(date +%s)
+		if (( ready == 0 && now - start >= READY_AFTER )); then
+			if compositor_ready "$mode"; then
+				ready=1; echo "$mode" >"$LAST_OK"; say "$mode: работает"
+			else
+				say "$mode: нет вывода изображения через ${READY_AFTER} с — следующий режим"
+				kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
+				wait "$pid" 2>/dev/null; exec 3<&-; return 1
+			fi
+		fi
+	done
+	# drain the rest of the output
+	while IFS= read -r -t 0.2 line <&3; do printf '%s\n' "$line" >>"$log"; done
+	exec 3<&-
+	wait "$pid" 2>/dev/null
+	local rc=$? ran=$(( $(date +%s) - start ))
+	if (( ready == 1 || ran >= QUICK_FAIL )); then
+		say "$mode: сеанс завершён (код $rc, ${ran} с)"
+		return 0
+	fi
+	say "$mode: завершился через ${ran} с (код $rc) — следующий режим"
+	return 1
+}
+
+# ---------------------------------------------------------------- main ---
+for mode in "${MODES[@]}"; do
+	run_mode "$mode"
+	case $? in
+		0) exit 0 ;;
+		2) break ;;
+	esac
+	# the remembered mode stopped working: forget it
+	[[ "$(cat "$LAST_OK" 2>/dev/null)" == "$mode" ]] && rm -f "$LAST_OK"
+done
+
+clear 2>/dev/null || true
+cat <<EOF
+
+  Huilo: графический режим не запустился.
+  Виртуализация: $virt.   Журналы: $STATE
+
+  * VirtualBox: выключите ВМ и включите «Настроить → Дисплей → 3D-ускорение»
+    (графический контроллер VMSVGA, видеопамять 128 МБ), обновите VirtualBox
+    и драйвер видеокарты на ПК. Лучше всего Hyprland работает в VMware
+    Workstation (с 3D-ускорением) и в QEMU/KVM с virtio-gpu (virgl).
+  * Принудительный режим:  huilo-session --set sway-software   (затем: exit)
+  * Снова автоматически:   huilo-session --reset
+  * Диагностика:           huilo-doctor
+
+EOF
+exit 1

@@ -1,0 +1,1 @@
+# Your own IPs / subnets to add to ipset-all (used by game filter and ipset profiles).

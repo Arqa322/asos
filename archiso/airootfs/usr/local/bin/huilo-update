@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-update — bring an installed Huilo up to date without reinstalling:
+#  new scripts, theme, configs (old ones kept as *.bak-<date>), migrations.
+#
+#    huilo-update                  latest version of the Huilo branch
+#    HUILO_REF=<branch> huilo-update
+#
+#  It is the same as
+#    curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/<branch>/scripts/update-installed.sh | sudo bash
+#  System packages are updated separately: sudo pacman -Syu
+# ============================================================================
+set -euo pipefail
+REF="${HUILO_REF:-claude/arch-hyprland-custom-image-hl6sdl}"
+case "${1:-}" in -h|--help) sed -n '2,13p' "$0"; exit 0 ;; esac
+if [[ $EUID -ne 0 ]]; then
+	exec sudo HUILO_REF="$REF" HUILO_REPO="${HUILO_REPO:-}" "$0" "$@"
+fi
+if grep -q archisobasedir /proc/cmdline 2>/dev/null; then
+	echo "Это live-образ: обновление не сохранится после перезагрузки. Скачайте свежий ISO." >&2
+	exit 1
+fi
+tmp=$(mktemp /var/tmp/huilo-update.XXXXXX.sh)
+trap 'rm -f "$tmp"' EXIT
+for repo in ${HUILO_REPO:-Arqa322/Huilo Arqa322/asos}; do
+	if curl -fsSL --retry 3 "https://raw.githubusercontent.com/$repo/$REF/scripts/update-installed.sh" -o "$tmp"; then
+		HUILO_REF="$REF" HUILO_REPO="$repo" bash "$tmp"
+		exit $?
+	fi
+done
+echo "Не удалось скачать обновление (нет сети или GitHub недоступен — попробуйте включить zapret)." >&2
+exit 1
