@@ -51,7 +51,10 @@ def read(path):
 
 def extract_api(src):
     cfg = os.path.join(src, "src", "config")
-    options = {name: kind for kind, name in re.findall(r'MS<(\w+)>\("([^"]+)"', read(os.path.join(cfg, "values", "ConfigValues.cpp")))}
+    # Lua option names are derived like CConfigManager::luaConfigValueName():
+    # "input:touchpad:tap-to-click" -> "input.touchpad.tap_to_click"
+    options = {name.replace(":", ".").replace("-", "_"): kind
+               for kind, name in re.findall(r'MS<(\w+)>\("([^"]+)"', read(os.path.join(cfg, "values", "ConfigValues.cpp")))}
 
     # hl.dsp.*: setDispatcherFn() entries belong to the table closed by the next lua_setfield(L, -2, "<name>")
     disp = read(os.path.join(cfg, "lua", "bindings", "LuaBindingsDispatchers.cpp"))
@@ -182,14 +185,12 @@ def type_ok(kind, val):
 def walk(tree, options, path, where, problems):
     for key, val in tree.items():
         p = path + [key]
-        name = ":".join(p)
-        dotted = ":".join(p[:-2] + [p[-2] + "." + p[-1]]) if len(p) >= 2 else None
-        opt = name if name in options else (dotted if dotted in options else None)
+        name = ".".join(p)
         is_leaf = isinstance(val, dict) and set(val) <= {"t", "v"} and "t" in val
-        if opt:
-            if not type_ok(options[opt], val if is_leaf else "table"):
-                problems.append(f"{where}: {opt} expects {options[opt]}, got {val.get('t') if is_leaf else 'table'}")
-        elif not is_leaf and isinstance(val, dict):
+        if name in options:
+            if not type_ok(options[name], val if is_leaf else "table"):
+                problems.append(f"{where}: {name} expects {options[name]}, got {val.get('t') if is_leaf else 'table'}")
+        elif not is_leaf and isinstance(val, dict) and any(o.startswith(name + ".") for o in options):
             walk(val, options, p, where, problems)
         else:
             problems.append(f"{where}: unknown option {name}")

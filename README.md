@@ -21,6 +21,8 @@ scripts/fetch-zapret.sh     загрузка nfqws (bol-van/zapret) и стра�
 scripts/build-aur.sh        сборка AUR-пакетов (Arduino IDE, rkdeveloptool …) в локальный репозиторий
 scripts/fetch-arduino.sh    предустановка ядер и библиотек Arduino в /etc/skel
 scripts/check-packages.py   проверка списков пакетов по актуальным репозиториям Arch (без сборки)
+scripts/pkg-select.sh       необязательные группы пакетов (--without / --minimal)
+scripts/make-wallpapers.py  генератор обоев и фона меню загрузки
 scripts/install-online.sh   установка ASOS с официального ISO Arch (без сборки образа)
 archiso/                    профиль archiso
   profiledef.sh             параметры образа
@@ -69,6 +71,7 @@ sudo ./build.sh
 | `ARDUINO_LIBS` | 15 популярных | библиотеки через `;` |
 | `SKIP_AUR=1` | — | не собирать AUR-пакеты (не будет Arduino IDE, rkdeveloptool, xfel, tio, yay) |
 | `SKIP_ARDUINO=1` | — | не предустанавливать ядра/библиотеки Arduino |
+| `ASOS_WITHOUT` | — | то же, что `--without` |
 
 Перед долгой сборкой можно за минуту проверить списки пакетов (работает на любой ОС с Python 3):
 
@@ -86,6 +89,52 @@ python3 scripts/check-packages.py
 > Лишнее можно закомментировать в `archiso/packages.x86_64`.
 
 Запись на флешку: `sudo dd if=out/asos-*.iso of=/dev/sdX bs=4M status=progress oflag=sync` или Ventoy / Rufus (режим DD).
+
+## Установка без лишних программ
+
+Пакеты разбиты на ядро системы (Hyprland, браузер, сеть, звук, драйверы, CLI) и необязательные группы:
+
+| Группа | Что внутри |
+|---|---|
+| `office` | LibreOffice, Zathura, Xournal++, KeePassXC, калькулятор |
+| `communication` | Thunderbird, Telegram, Discord, qBittorrent |
+| `media` | OBS Studio, GIMP |
+| `vscode` | VS Code (Code - OSS) |
+| `games` | Atom game pack: Steam, Lutris, Wine, GameMode, MangoHud, 32-битные драйверы |
+| `arduino` | Arduino IDE 2, arduino-cli, PlatformIO, esptool, OpenOCD, PulseView … |
+| `nanopi` | кросс-компилятор aarch64, qemu-user, rkdeveloptool, xfel … |
+| `monitoring`, `nettools`, `disktools`, `virt`, `security` | инструменты сисадмина (алиас `sysadmin` — все пять) |
+| `zapret` | обход DPI |
+| `aur` | AUR-помощник yay |
+
+Алиасы: `sysadmin`, `embedded` (= arduino + nanopi), `minimal` (= все группы, остаётся только ядро — ~160 пакетов вместо ~320).
+
+```bash
+sudo ./build.sh --without office,games,sysadmin     # ISO без офиса, игр и инструментов админа
+sudo ./build.sh --minimal                           # только ядро
+./build.sh --list-groups
+bash i.sh --without games,vscode                     # онлайн-установщик (или спросит сам)
+```
+
+В установщике с ISO (`asos-install`) группы отмечаются галочками. На установленной системе:
+
+```bash
+asos-groups list                  # что установлено
+sudo asos-groups add office       # доставить группу
+sudo asos-groups remove games     # удалить группу вместе с ненужными зависимостями
+```
+
+## Оформление
+
+* **Обои** — шесть оригинальных 4K-обоев, сгенерированных `scripts/make-wallpapers.py` (горы в сумерках, северное
+  сияние, поток, волны, туманность, эмблема ASOS) в палитре Catppuccin Mocha. `SUPER+W` — выбор с предпросмотром,
+  `SUPER+Shift+W` — следующие, `asos-wallpaper random`. Свои картинки — в `~/Изображения/Wallpapers`.
+  Плавная смена через awww, фон экрана блокировки — текущие обои с размытием. Меню загрузки BIOS — с фоном.
+* **fastfetch** (`ff`) — собственный логотип ASOS, блоки «Система / Железо / Сеть и ASOS», статус zapret и режима
+  графики. Показывается при открытии терминала (отключить: `touch ~/.config/asos/no-fastfetch`).
+* **Консоль** — приглашение starship (скруглённые сегменты: ОС, пользователь, каталог, git, языки, время команды),
+  kitty с темой Catppuccin, следом курсора и вкладками-«пилюлями», история на 50 000 команд, fzf (`Ctrl+R`),
+  man-страницы через bat. Текстовая консоль (tty) — в той же палитре, шрифт Terminus, приветствие ASOS.
 
 ## Live-режим
 

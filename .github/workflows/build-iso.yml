@@ -59,7 +59,7 @@ jobs:
           python3 scripts/check-hyprland-config.py --lua lua5.4 --config scripts/tests/hyprland-bad.lua >bad.txt 2>&1 || rc=$?
           cat bad.txt
           if [ "$rc" -eq 0 ]; then echo "::error::check-hyprland-config.py accepted a broken config"; exit 1; fi
-          for want in "unknown option general:gaps_inn" "decoration:rounding expects Int" "cursor:no_hardware_cursors expects Int" "unknown option misc:vfr" "unknown event" "closee"; do
+          for want in "unknown option general.gaps_inn" "decoration.rounding expects Int" "cursor.no_hardware_cursors expects Int" "unknown option misc.vfr" "unknown option input.touchpad.tap-to-click" "unknown event" "closee"; do
             grep -q "$want" bad.txt || { echo "::error::checker missed: $want"; exit 1; }
           done
 

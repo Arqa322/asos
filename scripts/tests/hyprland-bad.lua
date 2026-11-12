@@ -5,6 +5,7 @@ hl.config({
     decoration = { rounding = "8" },                  -- Int given a string
     cursor = { no_hardware_cursors = true },          -- Int given a boolean
     misc = { vfr = true },                            -- option removed (now debug:vfr)
+    input = { touchpad = { ["tap-to-click"] = true } }, -- Lua names use "_" (tap_to_click)
 })
 hl.on("hyprland.started", function() end)            -- unknown event
 hl.bind("SUPER + Q", hl.dsp.window.closee())          -- unknown dispatcher
