@@ -1,4 +1,4 @@
-name: Build ASOS ISO
+name: Build Huilo ISO
 
 on:
   push:
@@ -70,13 +70,13 @@ jobs:
     container: archlinux/archlinux:latest
     steps:
       - name: Install Hyprland, fastfetch, starship, sway
-        run: pacman -Syu --noconfirm --needed git hyprland fastfetch starship sway mesa ttf-jetbrains-mono-nerd
+        run: pacman -Syu --noconfirm --needed git hyprland fastfetch starship sway mesa ttf-jetbrains-mono-nerd plymouth jq
       - uses: actions/checkout@v5
-      - name: Prepare a test home with the ASOS skel
+      - name: Prepare a test home with the Huilo skel
         run: |
           useradd -m tester
           cp -a archiso/airootfs/etc/skel/. /home/tester/
-          cp -a archiso/airootfs/usr/share/asos /usr/share/
+          cp -a archiso/airootfs/usr/share/huilo /usr/share/
           chown -R tester:tester /home/tester
           install -d -m 0700 -o tester /tmp/xdg
       - name: Hyprland --verify-config (hyprland.lua)
@@ -85,23 +85,35 @@ jobs:
           echo "$out" | tail -n 40
           echo "exit code: $rc"
           if [ "$rc" -ne 0 ] || echo "$out" | grep -q -i -E 'config error|error in|errors in'; then echo "::error::Hyprland rejected hyprland.lua"; exit 1; fi
-      - name: fastfetch with the ASOS config
+      - name: fastfetch with the Huilo config
         run: |
           out=$(su tester -c 'fastfetch --pipe true 2>&1')
           echo "$out"
           if echo "$out" | grep -q -i -E 'error|unknown|invalid'; then echo "::error::fastfetch reported a config problem"; exit 1; fi
-          echo "$out" | grep -q '▟███▛' || { echo "::error::ASOS logo missing"; exit 1; }
-      - name: starship prompt with the ASOS config
+          echo "$out" | grep -q '▟███▛' || { echo "::error::Huilo logo missing"; exit 1; }
+      - name: starship prompt with the Huilo config
         run: |
           out=$(su tester -c 'cd ~ && starship print-config >/dev/null && starship prompt --status 0' 2>&1)
           echo "$out"
           if echo "$out" | grep -q -E 'WARN|ERROR'; then echo "::error::starship reported a config problem"; exit 1; fi
+      - name: Plymouth theme is recognised
+        run: |
+          cp -a archiso/airootfs/usr/share/plymouth/themes/huilo /usr/share/plymouth/themes/
+          plymouth-set-default-theme -l | tee themes.txt
+          grep -qx huilo themes.txt
+          for f in splash.png background.png bar.png huilo.script; do test -s /usr/share/plymouth/themes/huilo/$f; done
+      - name: EasyEffects presets are valid JSON with known plugin names
+        run: |
+          for f in archiso/airootfs/etc/skel/.local/share/easyeffects/output/*.json; do
+            jq -e '.output.plugins_order == ["equalizer#0"] and (.output["equalizer#0"].left | length) == .output["equalizer#0"]["num-bands"]' "$f" >/dev/null \
+              || { echo "::error::bad preset $f"; exit 1; }
+          done
       - name: sway --validate (safe graphics mode)
         # the packaged binary carries file capabilities, which an unprivileged
         # container refuses to exec; a plain copy is enough to parse the config
         run: |
           cp "$(command -v sway)" /usr/local/bin/sway-nocap
-          su tester -c 'XDG_RUNTIME_DIR=/tmp/xdg WLR_BACKENDS=headless WLR_RENDERER=pixman sway-nocap --validate -c /usr/share/asos/sway/config'
+          su tester -c 'XDG_RUNTIME_DIR=/tmp/xdg WLR_BACKENDS=headless WLR_RENDERER=pixman sway-nocap --validate -c /usr/share/huilo/sway/config'
 
   build:
     needs: check
@@ -124,7 +136,7 @@ jobs:
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
-          name: asos-iso
+          name: huilo-iso
           path: |
             out/*.iso
             out/*.sha256
@@ -145,11 +157,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
-          name: ASOS ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build {0}', github.run_number) }}
+          name: Huilo ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build {0}', github.run_number) }}
           body: |
             Собрать ISO из частей:
-            - Linux/macOS: `f=$(ls asos-*.iso.sha256); iso=${f%.sha256}; cat "$iso".part* > "$iso" && sha256sum -c "$f"`
-            - Windows (cmd): `copy /b asos-ВЕРСИЯ-x86_64.iso.part00 + asos-ВЕРСИЯ-x86_64.iso.part01 + ... asos-ВЕРСИЯ-x86_64.iso`
+            - Linux/macOS: `f=$(ls huilo-*.iso.sha256); iso=${f%.sha256}; cat "$iso".part* > "$iso" && sha256sum -c "$f"`
+            - Windows (cmd): `copy /b huilo-ВЕРСИЯ-x86_64.iso.part00 + huilo-ВЕРСИЯ-x86_64.iso.part01 + ... huilo-ВЕРСИЯ-x86_64.iso`
           files: |
             out/*.iso.part*
             out/*.sha256

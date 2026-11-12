@@ -1,0 +1,43 @@
+# ============================================================================
+#  Huilo: Arduino / ESP / STM32 / NanoPi (Rockchip, Allwinner) USB devices
+#
+#  * ModemManager must not probe Arduino boards and USB-UART adapters
+#    (it grabs /dev/ttyACM*/ttyUSB* for seconds and breaks uploads).
+#  * TAG+="uaccess" gives the logged-in user access to raw USB devices
+#    (DFU, debug probes, Rockchip maskrom, Allwinner FEL) without root.
+#    Must be numbered below 73-seat-late.rules to take effect.
+#  * Serial ports themselves belong to group "uucp" (Arch default);
+#    Huilo users are members of it.
+# ============================================================================
+
+SUBSYSTEM!="usb|tty", GOTO="huilo_embedded_end"
+
+# --- Arduino and compatible boards -----------------------------------------
+ATTRS{idVendor}=="2341", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+ATTRS{idVendor}=="2a03", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+ATTRS{idVendor}=="1b4f", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+ATTRS{idVendor}=="239a", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+ATTRS{idVendor}=="16c0", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- Espressif ESP32-S2/S3/C3/C6 native USB --------------------------------
+ATTRS{idVendor}=="303a", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- Raspberry Pi RP2040/RP2350 --------------------------------------------
+ATTRS{idVendor}=="2e8a", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- USB-UART adapters: CH340/CH343 (WCH), CP210x, FTDI, PL2303 -------------
+ATTRS{idVendor}=="1a86", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60|ea70|ea71", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+ATTRS{idVendor}=="0403", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+ATTRS{idVendor}=="067b", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- STMicroelectronics: ST-Link, STM32 DFU, Virtual COM --------------------
+ATTRS{idVendor}=="0483", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- Atmel/Microchip DFU and programmers (USBasp: 16c0 above) ---------------
+ATTRS{idVendor}=="03eb", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- Rockchip maskrom / loader (rkdeveloptool, NanoPi R/M/T series) ---------
+ATTRS{idVendor}=="2207", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- Allwinner FEL (sunxi-fel, xfel, NanoPi NEO/NEO2/Duo) -------------------
+ATTRS{idVendor}=="1f3a", ENV{ID_MM_DEVICE_IGNORE}="1", TAG+="uaccess"
+# --- Logic analyzers (sigrok fx2lafw, Saleae clones) ------------------------
+ATTRS{idVendor}=="0925", ATTRS{idProduct}=="3881", TAG+="uaccess"
+ATTRS{idVendor}=="1d50", ATTRS{idProduct}=="608c", TAG+="uaccess"
+# --- CH341A SPI flash programmer (flashrom) is covered by 1a86 above --------
+
+LABEL="huilo_embedded_end"

@@ -1,0 +1,48 @@
+ Huilo — горячие клавиши Hyprland(q — закрыть)
+ ===========================================================
+ SUPER + Enter          терминал (kitty)
+ SUPER + D              меню приложений (wofi)
+ SUPER + Q              закрыть окно
+ SUPER + F              полноэкранный режим
+ SUPER + V              плавающее окно
+ SUPER + E              файловый менеджер (Thunar)
+ SUPER + B              браузер (Firefox)
+ SUPER + O              LibreOffice
+ SUPER + A              Arduino IDE 2
+ SUPER + Shift + A      помощник Arduino (порты, загрузка, монитор, ядра)
+ SUPER + Shift + N      инструменты NanoPi (microSD, UART, поиск, maskrom)
+ SUPER + Z              меню zapret (стратегии, game filter, Atom)
+ SUPER + C              история буфера обмена
+ SUPER + L              заблокировать экран
+ SUPER + Esc            системный монитор (btop)
+ SUPER + Shift + S      скриншот области (с редактором)
+ Print                  скриншот экрана в буфер
+ SUPER + 1..0           рабочие столы
+ SUPER + Shift + 1..0   перенести окно на рабочий стол
+ SUPER + стрелки        фокус;  + Shift — переместить окно
+ SUPER + ЛКМ / ПКМ      двигать / менять размер окна
+ SUPER + Backspace      меню питания (блокировка, выход, перезагрузка)
+ SUPER + W              выбрать обои (с предпросмотром),  + Shift — следующие
+ SUPER + Shift + M      эквалайзер: выбрать пресет;  SUPER + Alt + M — окно эквалайзера
+ SUPER + Shift + L      последние серьёзные ошибки системы
+ SUPER + Shift + E      выйти из сеанса
+ Alt + Shift            раскладка EN/RU
+
+ Терминал
+ -----------------------------------------------------------
+ huilo-zapret           статус zapret (menu, list, set, game, ipset, atom, check)
+ huilo-game <cmd>       запуск игры с gamemode + MangoHud
+                        (в Steam: huilo-game %command%)
+ huilo-arduino          Arduino: doctor, boards, upload, monitor, setup esp32 ...
+ huilo-nanopi           NanoPi: boards, find, console, flash, share, chroot ...
+ pio                    PlatformIO Core;  esptool / mpremote — ESP32 и MicroPython
+ huilo-doctor           диагностика графики (почему не запускается Hyprland)
+ huilo-logs             подробный сбор журналов в архив (--redact — для отправки)
+ huilo-logwatch show    последние серьёзные ошибки;  ack — сбросить значок
+ huilo-eq preset bass   эквалайзер: balanced bass bright voice games night flat
+ huilo-groups list      группы программ; sudo huilo-groups add|remove office,games ...
+ huilo-wallpaper        обои: pick | next | random | set FILE (свои — в ~/Изображения/Wallpapers)
+ ff                     fastfetch — сводка о системе
+ huilo-session --set M  режим графики: hyprland-vm | hyprland-software | sway-software
+ sudo huilo-install     установка Huilo на диск
+ btop / htop / glances  мониторинг

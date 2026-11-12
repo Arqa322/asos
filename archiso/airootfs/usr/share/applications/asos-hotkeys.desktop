@@ -1,7 +1,0 @@
-[Desktop Entry]
-Name=Горячие клавиши ASOS
-Exec=kitty --title asos-help -e less /usr/share/asos/HOTKEYS.txt
-Icon=preferences-desktop-keyboard-shortcuts
-Terminal=false
-Type=Application
-Categories=Utility;

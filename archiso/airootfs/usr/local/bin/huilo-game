@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# huilo-game — run a game/program with Huilo gaming defaults:
+#   gamemode (CPU governor, priorities) + MangoHud overlay (+ optional gamescope)
+# Steam launch options:   huilo-game %command%
+# Without overlay:        HUILO_HUD=0 huilo-game %command%
+# Through gamescope:      HUILO_GAMESCOPE="-W 1920 -H 1080 -r 144 -f" huilo-game %command%
+set -euo pipefail
+[[ $# -gt 0 ]] || { echo "usage: huilo-game <command> [args...]"; exit 1; }
+cmd=("$@")
+[[ "${HUILO_HUD:-1}" == 1 ]] && command -v mangohud >/dev/null && cmd=(mangohud "${cmd[@]}")
+command -v gamemoderun >/dev/null && cmd=(gamemoderun "${cmd[@]}")
+if [[ -n "${HUILO_GAMESCOPE:-}" ]] && command -v gamescope >/dev/null; then
+	# shellcheck disable=SC2206
+	gs=(gamescope $HUILO_GAMESCOPE --)
+	cmd=("${gs[@]}" "${cmd[@]}")
+fi
+# Wine/Proton: prefer ntsync, enable FSR in fullscreen
+export PROTON_USE_NTSYNC=1 WINE_FULLSCREEN_FSR="${WINE_FULLSCREEN_FSR:-1}"
+exec "${cmd[@]}"

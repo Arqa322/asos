@@ -1,5 +1,5 @@
 # ============================================================
-#  ASOS package list (one package per line, '#' = comment)
+#  Huilo package list (one package per line, '#' = comment)
 #
 #  Section headers with a [tag] are OPTIONAL groups that can be
 #  left out:  ./build.sh --without office,games   (or --minimal)
@@ -40,6 +40,8 @@ less
 which
 dialog
 terminus-font
+# boot splash with the Huilo photo
+plymouth
 polkit
 udisks2
 upower
@@ -125,6 +127,12 @@ pipewire-pulse
 pipewire-jack
 wireplumber
 pavucontrol
+# system-wide equalizer and effects
+easyeffects
+lsp-plugins-lv2
+calf
+# provides lv2-host for lsp-plugins (otherwise pacman would pull in Ardour)
+pipewire-audio
 alsa-utils
 mpv
 imv

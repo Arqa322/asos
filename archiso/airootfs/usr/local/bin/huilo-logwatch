@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-logwatch — desktop alerts for serious system errors
+#
+#    huilo-logwatch run      watch the journal (started with the desktop session)
+#    huilo-logwatch status   JSON for the waybar indicator
+#    huilo-logwatch show     recent recorded errors (opens from the indicator)
+#    huilo-logwatch ack      reset the counter / hide the indicator
+#    huilo-logwatch test     send a test alert
+#
+#  Error (err) -> popup notification; critical (crit/alert/emerg, crashed
+#  programs, kernel oopses) -> red popup that stays until dismissed. Both offer
+#  "Собрать журналы" (huilo-logs) and "Подробнее". The waybar badge shows how
+#  many errors happened since the last "ack".
+#  Ignore noise: one regex per line in ~/.config/huilo/logwatch-ignore
+#  (matched against "identifier: message"); system-wide list in
+#  /usr/share/huilo/logwatch-ignore.
+# ============================================================================
+set -uo pipefail
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/huilo/logwatch"
+CONF_IGNORE="${XDG_CONFIG_HOME:-$HOME/.config}/huilo/logwatch-ignore"
+SYS_IGNORE=/usr/share/huilo/logwatch-ignore
+mkdir -p "$STATE"
+COUNT="$STATE/count" CRIT="$STATE/critical" EVENTS="$STATE/events.tsv"
+DEDUP_SECONDS=600      # the same message is announced at most once per 10 minutes
+MIN_GAP=15             # at most one popup per 15 s, the rest is summarised
+
+num() { local v; v=$(cat "$1" 2>/dev/null); echo "${v:-0}"; }
+# notification markup; "\&" because a bare & in a bash 5.2 replacement means "the match"
+esc() { local s=${1//&/\&amp;}; s=${s//</\&lt;}; s=${s//>/\&gt;}; printf '%s' "$s"; }
+US=$'\x1f'   # field separator: not whitespace, so empty fields survive `read`
+NL=$'\n'
+
+alert() { # urgency title body
+	local urgency=$1 title=$2 body=$3
+	command -v notify-send >/dev/null || return 0
+	(
+		action=$(notify-send -a Huilo -u "$urgency" -i dialog-error \
+			-A logs="Собрать журналы" -A details="Подробнее" -w "$title" "$body" 2>/dev/null)
+		case "$action" in
+			logs) setsid -f kitty --title huilo-logs -e sh -c 'huilo-logs; echo; read -rp "Enter — закрыть" _' ;;
+			details) setsid -f kitty --title huilo-logwatch -e sh -c 'huilo-logwatch show; echo; read -rp "Enter — закрыть" _' ;;
+		esac
+	) >/dev/null 2>&1 &
+}
+
+ignore_re() { # one big ERE from both ignore files
+	cat "$SYS_IGNORE" "$CONF_IGNORE" 2>/dev/null | sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' | paste -sd '|'
+}
+
+cmd_run() {
+	exec 9>"$STATE/lock"
+	flock -n 9 || { echo "huilo-logwatch is already running"; exit 0; }
+	command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
+	local re last_popup=0 suppressed=0
+	re=$(ignore_re)
+	declare -A seen=()
+	# -p 3: emerg..err, from now on; both the system and the user journal
+	journalctl -f -n 0 -o json -p 3 2>/dev/null | jq --unbuffered -r '
+		[ (.PRIORITY // "3"),
+		  (.SYSLOG_IDENTIFIER // ._COMM // "system"),
+		  (._SYSTEMD_UNIT // ._SYSTEMD_USER_UNIT // ""),
+		  (if (.MESSAGE | type) == "string" then .MESSAGE else "(двоичное сообщение)" end)
+		] | map(tostring | gsub("[\\t\\n\\r\u001f]"; " ")) | join("\u001f")' 2>/dev/null |
+	while IFS=$US read -r prio ident unit msg; do
+		local line="$ident: $msg"
+		[[ -n "$re" ]] && grep -qE -- "$re" <<<"$line" && continue
+		local now key
+		now=$(date +%s)
+		key="$ident|${msg:0:120}"
+		(( now - ${seen[$key]:-0} < DEDUP_SECONDS )) && continue
+		seen[$key]=$now
+		printf '%s\x1f%s\x1f%s\x1f%s\x1f%s\n' "$(date '+%F %T')" "$prio" "$ident" "$unit" "${msg:0:400}" >>"$EVENTS"
+		tail -n 200 "$EVENTS" >"$EVENTS.tmp" && mv "$EVENTS.tmp" "$EVENTS"
+		echo $(( $(num "$COUNT") + 1 )) >"$COUNT"
+		(( prio <= 2 )) && echo $(( $(num "$CRIT") + 1 )) >"$CRIT"
+
+		# kernel oops / crashed programs are critical whatever their priority
+		local urgency=normal title="Ошибка: $ident"
+		if (( prio <= 2 )) || [[ "$msg" =~ (dumped\ core|segfault|Oops|BUG:|Kernel\ panic|I/O\ error|Out\ of\ memory) ]]; then
+			urgency=critical; title="Критическая ошибка: $ident"
+		fi
+		if (( now - last_popup < MIN_GAP )) && [[ $urgency != critical ]]; then
+			suppressed=$((suppressed + 1)); continue
+		fi
+		local body
+		body=$(esc "${msg:0:300}")
+		[[ -n "$unit" ]] && body="$body$NL<i>служба: $(esc "$unit")</i>"
+		(( suppressed > 0 )) && body="$body$NL(ещё ошибок до этого: $suppressed)"
+		suppressed=0; last_popup=$now
+		alert "$urgency" "$title" "$body"
+	done
+}
+
+cmd_status() {
+	local n c last tip
+	n=$(num "$COUNT"); c=$(num "$CRIT")
+	if (( n == 0 )); then
+		printf '{"text":"","class":"ok","tooltip":"Серьёзных ошибок нет"}\n'; return
+	fi
+	last=$(tail -n 1 "$EVENTS" 2>/dev/null | cut -d"$US" -f3,5 | tr "$US" ':' | cut -c1-140 | sed 's/["\\]/ /g')
+	tip="Ошибок: $n (критических: $c)\\nПоследняя: $last\\n\\nЛКМ — подробнее, ПКМ — сбросить, СКМ — собрать журналы"
+	if (( c > 0 )); then
+		printf '{"text":"󰀦 %s","class":"critical","tooltip":"%s"}\n' "$n" "$tip"
+	else
+		printf '{"text":"󰀪 %s","class":"error","tooltip":"%s"}\n' "$n" "$tip"
+	fi
+}
+
+cmd_show() {
+	echo -e "\e[1mHuilo: последние серьёзные ошибки\e[0m  (всего: $(num "$COUNT"), критических: $(num "$CRIT"))"
+	if [[ ! -s "$EVENTS" ]]; then echo "  записей нет"; return; fi
+	tail -n 25 "$EVENTS" | while IFS=$US read -r t prio ident unit msg; do
+		local c=$'\e[33m'; (( prio <= 2 )) && c=$'\e[31m'
+		printf '%s%s\e[0m  %s%s\e[0m%s\n    %s\n' $'\e[2m' "$t" "$c" "$ident" "${unit:+ ($unit)}" "${msg:0:300}"
+	done
+	echo
+	echo "Полный отчёт: huilo-logs  (для отправки: huilo-logs --redact)   ·   Сбросить счётчик: huilo-logwatch ack"
+	echo "Скрыть повторяющуюся ошибку: добавьте её текст (регулярное выражение) в ~/.config/huilo/logwatch-ignore"
+}
+
+case "${1:-run}" in
+	run) cmd_run ;;
+	status) cmd_status ;;
+	show) cmd_show ;;
+	ack) : >"$COUNT"; : >"$CRIT"; pkill -RTMIN+9 waybar 2>/dev/null; echo "счётчик ошибок сброшен" ;;
+	test) alert critical "Критическая ошибка: проверка" "Так выглядит уведомление huilo-logwatch.${NL}Кнопки: собрать журналы / подробнее." ;;
+	-h|--help) sed -n '2,19p' "$0" ;;
+	*) sed -n '2,19p' "$0"; exit 1 ;;
+esac

@@ -1,4 +1,4 @@
-# mkinitcpio preset file for the 'linux' package on ASOS live medium
+# mkinitcpio preset file for the 'linux' package on Huilo live medium
 
 PRESETS=('archiso')
 

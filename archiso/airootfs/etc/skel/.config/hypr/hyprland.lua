@@ -1,5 +1,5 @@
 -- ============================================================
---  ASOS — Hyprland configuration (Hyprland 0.57+, Lua)
+--  Huilo — Hyprland configuration (Hyprland 0.57+, Lua)
 --  Wiki: https://wiki.hypr.land/configuring/
 --  Keys: SUPER+Enter terminal | SUPER+D launcher | SUPER+Q close
 --        SUPER+E files | SUPER+Z zapret menu | SUPER+F1 cheat sheet
@@ -35,7 +35,7 @@ local VM = in_vm()
 hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("mako")
-    hl.exec_cmd("asos-wallpaper")
+    hl.exec_cmd("huilo-wallpaper")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("nm-applet --indicator")
     hl.exec_cmd("blueman-applet")
@@ -43,7 +43,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd("xdg-user-dirs-update")
-    hl.exec_cmd("asos-welcome")
+    hl.exec_cmd("huilo-welcome")
+    hl.exec_cmd("huilo-logwatch run")
+    hl.exec_cmd("huilo-eq start")
 end)
 
 ------------------------------------------------------------- environment ---
@@ -160,18 +162,21 @@ hl.bind(mod .. " + P",           hl.dsp.window.pseudo())
 hl.bind(mod .. " + J",           hl.dsp.layout("togglesplit"))
 hl.bind(mod .. " + L",           hl.dsp.exec_cmd("hyprlock"))
 hl.bind(mod .. " + C",           hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
-hl.bind(mod .. " + Z",           hl.dsp.exec_cmd("kitty --title asos-zapret -e asos-zapret menu"))
-hl.bind(mod .. " + F1",          hl.dsp.exec_cmd("kitty --title asos-help -e less /usr/share/asos/HOTKEYS.txt"))
+hl.bind(mod .. " + Z",           hl.dsp.exec_cmd("kitty --title huilo-zapret -e huilo-zapret menu"))
+hl.bind(mod .. " + F1",          hl.dsp.exec_cmd("kitty --title huilo-help -e less /usr/share/huilo/HOTKEYS.txt"))
 hl.bind(mod .. " + O",           hl.dsp.exec_cmd("libreoffice"))
 hl.bind(mod .. " + A",           hl.dsp.exec_cmd("arduino-ide"))
-hl.bind(mod .. " + SHIFT + A",   hl.dsp.exec_cmd("kitty --title asos-arduino -e asos-arduino menu"))
-hl.bind(mod .. " + SHIFT + N",   hl.dsp.exec_cmd("kitty --title asos-nanopi -e asos-nanopi menu"))
+hl.bind(mod .. " + SHIFT + A",   hl.dsp.exec_cmd("kitty --title huilo-arduino -e huilo-arduino menu"))
+hl.bind(mod .. " + SHIFT + N",   hl.dsp.exec_cmd("kitty --title huilo-nanopi -e huilo-nanopi menu"))
 hl.bind(mod .. " + SHIFT + S",   hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | swappy -f -"))
 hl.bind("Print",                 hl.dsp.exec_cmd("grim - | wl-copy && notify-send 'Скриншот' 'Скопирован в буфер обмена'"))
 hl.bind(mod .. " + Escape",      hl.dsp.exec_cmd("kitty --title btop -e btop"))
-hl.bind(mod .. " + BackSpace",   hl.dsp.exec_cmd("asos-power"))
-hl.bind(mod .. " + W",           hl.dsp.exec_cmd("asos-wallpaper pick"))
-hl.bind(mod .. " + SHIFT + W",   hl.dsp.exec_cmd("asos-wallpaper next"))
+hl.bind(mod .. " + BackSpace",   hl.dsp.exec_cmd("huilo-power"))
+hl.bind(mod .. " + W",           hl.dsp.exec_cmd("huilo-wallpaper pick"))
+hl.bind(mod .. " + SHIFT + W",   hl.dsp.exec_cmd("huilo-wallpaper next"))
+hl.bind(mod .. " + SHIFT + M",   hl.dsp.exec_cmd("huilo-eq menu"))
+hl.bind(mod .. " + ALT + M",     hl.dsp.exec_cmd("huilo-eq"))
+hl.bind(mod .. " + SHIFT + L",   hl.dsp.exec_cmd("kitty --title huilo-logwatch -e sh -c 'huilo-logwatch show; read -rp Enter _'"))
 
 -- focus / move windows
 for _, dir in ipairs({ "left", "right", "up", "down" }) do
@@ -213,5 +218,5 @@ hl.bind("XF86AudioPrev",         hl.dsp.exec_cmd("playerctl previous"),   { lock
 -- It is loaded with pcall so a mistake there does not break this file.
 local ok, err = pcall(require, "user")
 if not ok and not tostring(err):find("not found", 1, true) then
-    print("ASOS: error in user.lua: " .. tostring(err))
+    print("Huilo: error in user.lua: " .. tostring(err))
 end

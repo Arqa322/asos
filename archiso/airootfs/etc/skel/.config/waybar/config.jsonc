@@ -6,6 +6,7 @@
     "modules-left": ["custom/launcher", "hyprland/workspaces", "hyprland/window"],
     "modules-center": ["clock"],
     "modules-right": [
+        "custom/health",
         "custom/zapret",
         "hyprland/language",
         "pulseaudio",
@@ -35,19 +36,30 @@
         "tooltip-format": "<tt>{calendar}</tt>",
         "locale": "ru_RU.UTF-8"
     },
+    "custom/health": {
+        "exec": "huilo-logwatch status",
+        "return-type": "json",
+        "interval": 30,
+        "signal": 9,
+        "format": "{}",
+        "on-click": "kitty --title huilo-logwatch -e sh -c 'huilo-logwatch show; read -rp Enter _'",
+        "on-click-right": "huilo-logwatch ack",
+        "on-click-middle": "kitty --title huilo-logs -e sh -c 'huilo-logs; read -rp Enter _'"
+    },
     "custom/zapret": {
-        "exec": "asos-zapret waybar",
+        "exec": "huilo-zapret waybar",
         "return-type": "json",
         "interval": 5,
         "format": "{} zapret",
-        "on-click": "kitty --title asos-zapret -e asos-zapret menu",
-        "on-click-right": "sudo -n asos-zapret toggle || kitty -e sudo asos-zapret toggle"
+        "on-click": "kitty --title huilo-zapret -e huilo-zapret menu",
+        "on-click-right": "sudo -n huilo-zapret toggle || kitty -e sudo huilo-zapret toggle"
     },
     "pulseaudio": {
         "format": "{icon} {volume}%",
         "format-muted": "󰝟 mute",
         "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
         "on-click": "pavucontrol",
+        "on-click-middle": "huilo-eq",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
     "network": {
@@ -70,6 +82,6 @@
     "custom/power": {
         "format": "⏻",
         "tooltip": false,
-        "on-click": "asos-power"
+        "on-click": "huilo-power"
     }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the ASOS package lists against the current Arch Linux repositories.
+"""Validate the Huilo package lists against the current Arch Linux repositories.
 
   scripts/check-packages.py [--cache DIR] [--mirror URL] [--no-aur]
 
@@ -24,11 +24,14 @@ import urllib.parse
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# provider choices pacman may make on its own; anything else must be pinned in
+# packages.x86_64 (e.g. lv2-host would otherwise pull in the Ardour DAW)
+ALLOWED_AUTO = {"libxtables.so": "iptables", "qt6-multimedia-backend": "qt6-multimedia-ffmpeg"}
 REPOS = ["core", "extra", "multilib"]
 
 
 def fetch(url, dest):
-    req = urllib.request.Request(url, headers={"User-Agent": "asos-check-packages"})
+    req = urllib.request.Request(url, headers={"User-Agent": "huilo-check-packages"})
     with urllib.request.urlopen(req, timeout=300) as r, open(dest + ".part", "wb") as f:
         while chunk := r.read(1 << 20):
             f.write(chunk)
@@ -214,12 +217,14 @@ def main():
         print("provider choices made automatically (pin one explicitly if the default is wrong):")
         for name, pkg, cands in sorted(choices):
             print(f"  {name:28} -> {pkg:28} [{cands}]")
+            if ALLOWED_AUTO.get(name) != pkg:
+                errors.append(f"unpinned provider choice: {name} -> {pkg} (add the wanted provider to packages.x86_64)")
 
     if not args.no_aur and os.path.exists(args.aur_list):
         aur = read_list(args.aur_list)
         q = urllib.parse.urlencode([("arg[]", a) for a in aur])
         req = urllib.request.Request(f"https://aur.archlinux.org/rpc/v5/info?{q}",
-                                     headers={"User-Agent": "asos-check-packages"})
+                                     headers={"User-Agent": "huilo-check-packages"})
         with urllib.request.urlopen(req, timeout=60) as r:
             results = {p["Name"]: p for p in json.load(r)["results"]}
         built = set()

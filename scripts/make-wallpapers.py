@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Generate the original ASOS wallpapers (procedural, deterministic).
+"""Generate the original Huilo wallpapers (procedural, deterministic).
 
   python3 scripts/make-wallpapers.py [--out DIR] [--size 3840x2160] [--only NAME]
 
 All images are made from scratch here — noise, curves and particles in the
-Catppuccin Mocha palette used across ASOS — so they can be shipped freely.
+Catppuccin Mocha palette used across Huilo — so they can be shipped freely.
 Outputs JPEG wallpapers, 480x270 thumbnails (wallpaper picker) and the
 640x480 syslinux boot menu background. Needs numpy and Pillow.
 """
@@ -16,8 +16,10 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "archiso", "airootfs", "usr", "share", "backgrounds", "asos")
+OUT = os.path.join(ROOT, "archiso", "airootfs", "usr", "share", "backgrounds", "huilo")
 SPLASH = os.path.join(ROOT, "archiso", "syslinux", "splash.png")
+PHOTO = os.path.join(ROOT, "assets", "huilo-photo.jpg")      # the project photo (boot splash, wallpaper #1)
+PLYMOUTH = os.path.join(ROOT, "archiso", "airootfs", "usr", "share", "plymouth", "themes", "huilo")
 
 C = {  # Catppuccin Mocha
     "crust": "#11111b", "mantle": "#181825", "base": "#1e1e2e", "surface0": "#313244",
@@ -331,7 +333,7 @@ def nebula(w, h, rng):
     return img * vignette(h, w, 0.4)[..., None]
 
 def emblem(layer, cx, cy, s):
-    """The ASOS mark: a gradient peak ("A") with an orbit ring passing behind and in front."""
+    """The Huilo mark: a gradient peak ("A") with an orbit ring passing behind and in front."""
     w, h = layer.size
     ring = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     rd = ImageDraw.Draw(ring)
@@ -353,7 +355,7 @@ def emblem(layer, cx, cy, s):
     layer.alpha_composite(front)
 
 def mark(w, h, rng, size=None):
-    """Minimal wallpaper: radial glow + the ASOS emblem and wordmark."""
+    """Minimal wallpaper: radial glow + the Huilo emblem and wordmark."""
     Y, X = np.ogrid[:h, :w]
     d = np.sqrt(((X - w / 2) / w) ** 2 + ((Y - h * 0.45) / h) ** 2)
     img = gradient_map(np.clip(d * 1.6, 0, 1), [(0, "#2a2a44"), (0.45, "base"), (1, "crust")])
@@ -364,7 +366,7 @@ def mark(w, h, rng, size=None):
     dr = ImageDraw.Draw(layer)
     try:
         font = ImageFont.truetype("/usr/share/fonts/opentype/inter/Inter-Light.otf", int(h * 0.055 * ss))
-        text = "A S O S"
+        text = "H U I L O"
         tw = dr.textlength(text, font=font)
         dr.text((w * ss / 2 - tw / 2, h * 0.66 * ss), text, font=font, fill=(205, 214, 244, 235))
     except OSError:
@@ -377,13 +379,60 @@ def mark(w, h, rng, size=None):
     return img
 
 
+def fit_on_blur(src, w, h, blur=40, darken=0.35):
+    """Fit src into w x h (whole image visible); the free space is filled with a
+    blurred, darkened cover-scaled copy of the same image."""
+    sw, sh = src.size
+    cover = max(w / sw, h / sh)
+    bg = src.resize((max(w, int(sw * cover + 0.5)), max(h, int(sh * cover + 0.5))), Image.LANCZOS)
+    bg = bg.crop(((bg.width - w) // 2, (bg.height - h) // 2, (bg.width - w) // 2 + w, (bg.height - h) // 2 + h))
+    bg = bg.filter(ImageFilter.GaussianBlur(blur))
+    bg = Image.blend(bg, Image.new("RGB", (w, h), (17, 17, 27)), darken)
+    fit = min(w / sw, h / sh)
+    fg = src.resize((int(sw * fit + 0.5), int(sh * fit + 0.5)), Image.LANCZOS)
+    if fit > 1.5:  # upscaled a lot: a light unsharp mask keeps edges crisp
+        fg = fg.filter(ImageFilter.UnsharpMask(radius=2, percent=60, threshold=2))
+    x, y = (w - fg.width) // 2, (h - fg.height) // 2
+    shadow = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(shadow).rectangle([x + 8, y + 12, x + fg.width + 8, y + fg.height + 12], fill=170)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(max(6, w // 160)))
+    bg.paste(Image.new("RGB", (w, h), (0, 0, 0)), (0, 0), shadow)
+    bg.paste(fg, (x, y))
+    return bg
+
+
+def photo(w, h, rng):
+    src = Image.open(PHOTO).convert("RGB")
+    return np.asarray(fit_on_blur(src, w, h), np.float32) / 255
+
+
+def photo_assets():
+    """syslinux boot menu background and the Plymouth boot splash from the photo."""
+    src = Image.open(PHOTO).convert("RGB")
+    fit_on_blur(src, 640, 480, blur=18, darken=0.25).save(SPLASH, optimize=True)
+    print(f"{SPLASH}  {os.path.getsize(SPLASH) // 1024} KiB")
+    os.makedirs(PLYMOUTH, exist_ok=True)
+    # the script theme scales splash.png to fit the screen over background.png
+    big = src.resize((src.width * 2, src.height * 2), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=2, percent=50, threshold=2))
+    big.save(os.path.join(PLYMOUTH, "splash.png"), optimize=True)
+    bg = fit_on_blur(src, 1920, 1080, blur=45, darken=0.45)
+    bg = bg.filter(ImageFilter.GaussianBlur(30))       # only the colours of the photo
+    bg.save(os.path.join(PLYMOUTH, "background.png"), optimize=True)
+    print(f"{PLYMOUTH}/splash.png + background.png")
+
+
+# fixed seeds per wallpaper: adding or reordering entries never changes the others
+SEEDS = {"huilo-peaks": 1000, "huilo-aurora": 1001, "huilo-flow": 1002, "huilo-waves": 1003,
+         "huilo-nebula": 1004, "huilo-mark": 1005, "huilo-photo": 1006}
+
 WALLPAPERS = [
-    ("asos-peaks", "Горы в сумерках", peaks),
-    ("asos-aurora", "Северное сияние", aurora),
-    ("asos-flow", "Поток", flow),
-    ("asos-waves", "Волны", waves),
-    ("asos-nebula", "Туманность", nebula),
-    ("asos-mark", "Эмблема ASOS", mark),
+    ("huilo-photo", "В пизду (фото)", photo),
+    ("huilo-peaks", "Горы в сумерках", peaks),
+    ("huilo-aurora", "Северное сияние", aurora),
+    ("huilo-flow", "Поток", flow),
+    ("huilo-waves", "Волны", waves),
+    ("huilo-nebula", "Туманность", nebula),
+    ("huilo-mark", "Эмблема Huilo", mark),
 ]
 
 
@@ -399,18 +448,14 @@ def main():
     for i, (name, title, fn) in enumerate(WALLPAPERS):
         if args.only and args.only != name:
             continue
-        rng = np.random.default_rng(1000 + i)
+        rng = np.random.default_rng(SEEDS.get(name, 999))
         im = finish(fn(w, h, rng), rng)
         path = os.path.join(args.out, name + ".jpg")
         im.save(path, quality=args.quality, subsampling=0, optimize=True, progressive=True)
         im.resize((480, 270), Image.LANCZOS).save(os.path.join(args.out, "thumbs", name + ".jpg"), quality=88)
         print(f"{path}  {os.path.getsize(path) // 1024} KiB  ({title})")
-        if name == "asos-mark" and not args.only and args.out == OUT:
-            # syslinux boot menu background (640x480, darkened so the menu stays readable)
-            sp = im.resize((854, 480), Image.LANCZOS).crop((107, 0, 747, 480))
-            sp = Image.blend(sp, Image.new("RGB", sp.size, (17, 17, 27)), 0.35)
-            sp.save(SPLASH, optimize=True)
-            print(f"{SPLASH}  {os.path.getsize(SPLASH) // 1024} KiB")
+    if not args.only and args.out == OUT:
+        photo_assets()
     with open(os.path.join(args.out, "wallpapers.txt"), "w", encoding="utf-8") as f:
         for name, title, _ in WALLPAPERS:
             f.write(f"{name}.jpg\t{title}\n")

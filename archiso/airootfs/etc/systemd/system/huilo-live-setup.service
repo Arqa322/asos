@@ -1,0 +1,13 @@
+[Unit]
+Description=Huilo live session setup (user groups)
+ConditionKernelCommandLine=archisobasedir
+After=systemd-sysusers.service
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/huilo-user-groups huilo
+
+[Install]
+WantedBy=multi-user.target

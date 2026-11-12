@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Create and start an ASOS virtual machine in Oracle VirtualBox (Linux/macOS).
+#  Create and start an Huilo virtual machine in Oracle VirtualBox (Linux/macOS).
 #  Same settings as create-vm.ps1: <=4 cores, <=8 GB RAM, 20 GB VDI on SATA
 #  (AHCI, not NVMe), EFI, VMSVGA + 3D, NAT, USB 3.0, ISO from ~/Downloads.
 #
-#  usage: ./create-vm.sh [--iso PATH] [--name ASOS] [--cpus 4] [--memory 8192]
+#  usage: ./create-vm.sh [--iso PATH] [--name Huilo] [--cpus 4] [--memory 8192]
 #                        [--disk 20] [--boot-wait 90] [--no-autotype] [--recreate]
-#         ./create-vm.sh --type-update   # type the ASOS update command into the running VM
+#         ./create-vm.sh --type-update   # type the Huilo update command into the running VM
 # ============================================================================
 set -euo pipefail
 
-NAME=ASOS CPUS=4 MEM=8192 DISK=20 ISO="" WAIT=90 AUTOTYPE=1 RECREATE=0 TYPE_UPDATE=0
-UPDATE_CMD="curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash"
-INSTALL_CMD="curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh && bash i.sh"
+NAME=Huilo CPUS=4 MEM=8192 DISK=20 ISO="" WAIT=90 AUTOTYPE=1 RECREATE=0 TYPE_UPDATE=0
+UPDATE_CMD="curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash"
+INSTALL_CMD="curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh && bash i.sh"
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -100,7 +100,12 @@ start_vm() {
 command -v VBoxManage >/dev/null || die "VBoxManage не найден — установлен ли VirtualBox?"
 info "VirtualBox $(VBoxManage --version)"
 
-# --type-update: type the ASOS update command into an already running VM
+# the project used to be called ASOS: reuse a VM with the old default name
+if [[ "$NAME" == Huilo ]] && ! VBoxManage list vms | grep -q '^"Huilo" ' && VBoxManage list vms | grep -q '^"ASOS" '; then
+	NAME=ASOS; info "найдена ВМ ASOS (старое имя проекта) — используется она"
+fi
+
+# --type-update: type the Huilo update command into an already running VM
 # (log in on a text console first: Host key + F2 in the VM window)
 if [[ $TYPE_UPDATE == 1 ]]; then
 	[[ "$(vm_state "$NAME")" == running ]] || die "ВМ \"$NAME\" не запущена"
@@ -115,7 +120,7 @@ if [[ -z "$ISO" ]]; then
 	dl=$(xdg-user-dir DOWNLOAD 2>/dev/null || true)
 	[[ -d "$dl" && "$dl" != "$HOME" ]] || for d in "$HOME/Загрузки" "$HOME/Downloads"; do [[ -d "$d" ]] && { dl=$d; break; }; done
 	info "ищу ISO в $dl"
-	ISO=$(ls -t "$dl"/asos-*.iso 2>/dev/null | head -n1 || true)
+	ISO=$(ls -t "$dl"/huilo-*.iso 2>/dev/null | head -n1 || true)
 	[[ -n "$ISO" ]] || ISO=$(ls -t "$dl"/archlinux-*.iso 2>/dev/null | head -n1 || true)
 	[[ -n "$ISO" ]] || ISO=$(ls -t "$dl"/*.iso 2>/dev/null | head -n1 || true)
 	[[ -n "$ISO" ]] || die "в $dl нет файлов .iso — укажите --iso /путь/к/образу.iso"
@@ -141,7 +146,7 @@ info "хост: $cores физ. ядер, $ram МБ ОЗУ  ->  ВМ: $CPUS яд�
 # ------------------------------------------------------------ create VM
 START_EXISTING=0 ALREADY_RUNNING=0
 if VBoxManage list vms | grep -q "^\"$NAME\" " && [[ $RECREATE == 0 ]]; then
-	info "ВМ \"$NAME\" уже существует (пересоздать с нуля: --recreate, другая ВМ: --name ASOS2)"
+	info "ВМ \"$NAME\" уже существует (пересоздать с нуля: --recreate, другая ВМ: --name Huilo2)"
 	read -rp "Запустить существующую ВМ \"$NAME\"? [Y/n] " a
 	[[ -z "$a" || "$a" =~ ^[YyДд] ]] || die "отменено"
 	START_EXISTING=1
@@ -187,7 +192,7 @@ info "запуск ВМ"
 start_vm "$NAME"
 
 echo
-echo "Команда установщика ASOS для консоли Arch live:"
+echo "Команда установщика Huilo для консоли Arch live:"
 echo "  $INSTALL_CMD"
 echo
 if [[ $AUTOTYPE == 1 && $ALREADY_RUNNING == 0 && "$(basename "$ISO")" == archlinux-* ]]; then

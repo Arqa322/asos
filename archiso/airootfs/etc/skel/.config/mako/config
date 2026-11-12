@@ -7,3 +7,12 @@ border-radius=8
 default-timeout=6000
 anchor=top-right
 margin=10
+
+[urgency=low]
+default-timeout=3000
+
+[urgency=critical]
+border-color=#f38ba8
+background-color=#2a1b24ee
+default-timeout=0
+layer=overlay

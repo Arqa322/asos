@@ -1,0 +1,77 @@
+// Huilo boot splash (Plymouth "script" theme)
+// background.png: blurred colours of the photo (covers the screen)
+// splash.png:     the photo, shown whole, as large as fits
+// bar.png:        1x1 accent colour for the progress bar
+
+Window.SetBackgroundTopColor(0.067, 0.067, 0.106);
+Window.SetBackgroundBottomColor(0.067, 0.067, 0.106);
+
+sw = Window.GetWidth();
+sh = Window.GetHeight();
+wx = Window.GetX();
+wy = Window.GetY();
+
+bg_src = Image("background.png");
+bg_scale = Math.Max(sw / bg_src.GetWidth(), sh / bg_src.GetHeight());
+bg_w = bg_src.GetWidth() * bg_scale;
+bg_h = bg_src.GetHeight() * bg_scale;
+bg = Sprite(bg_src.Scale(bg_w, bg_h));
+bg.SetPosition(wx + (sw - bg_w) / 2, wy + (sh - bg_h) / 2, -10);
+
+photo_src = Image("splash.png");
+photo_scale = Math.Min(sw * 0.86 / photo_src.GetWidth(), sh * 0.78 / photo_src.GetHeight());
+photo_w = photo_src.GetWidth() * photo_scale;
+photo_h = photo_src.GetHeight() * photo_scale;
+photo_x = wx + (sw - photo_w) / 2;
+photo_y = wy + (sh - photo_h) / 2 - sh * 0.03;
+photo = Sprite(photo_src.Scale(photo_w, photo_h));
+photo.SetPosition(photo_x, photo_y, 0);
+
+// progress bar below the photo
+bar_w = photo_w * 0.5;
+bar_h = Math.Max(4, sh * 0.006);
+bar_x = wx + (sw - bar_w) / 2;
+bar_y = photo_y + photo_h + sh * 0.035;
+bar_src = Image("bar.png");
+track = Sprite(bar_src.Scale(bar_w, bar_h));
+track.SetPosition(bar_x, bar_y, 1);
+track.SetOpacity(0.25);
+fill = Sprite();
+fill.SetPosition(bar_x, bar_y, 2);
+
+fun progress_callback(duration, progress) {
+	w = Math.Int(bar_w * progress);
+	if (w < 1)
+		w = 1;
+	fill.SetImage(bar_src.Scale(w, bar_h));
+}
+Plymouth.SetBootProgressFunction(progress_callback);
+
+// password prompt (encrypted disks)
+prompt = Sprite();
+bullets = Sprite();
+fun display_password_callback(text, count) {
+	prompt.SetImage(Image.Text(text, 0.80, 0.84, 0.96));
+	prompt.SetPosition(wx + (sw - prompt.GetImage().GetWidth()) / 2, bar_y + sh * 0.03, 10);
+	prompt.SetOpacity(1);
+	stars = "";
+	for (i = 0; i < count; i++)
+		stars += "*";
+	bullets.SetImage(Image.Text(stars + " ", 0.54, 0.71, 0.98));
+	bullets.SetPosition(wx + (sw - bullets.GetImage().GetWidth()) / 2, bar_y + sh * 0.06, 10);
+	bullets.SetOpacity(1);
+}
+fun display_normal_callback() {
+	prompt.SetOpacity(0);
+	bullets.SetOpacity(0);
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+
+// boot messages (e.g. fsck) at the bottom
+message = Sprite();
+fun message_callback(text) {
+	message.SetImage(Image.Text(text, 0.80, 0.84, 0.96));
+	message.SetPosition(wx + (sw - message.GetImage().GetWidth()) / 2, wy + sh - sh * 0.06, 10);
+}
+Plymouth.SetDisplayMessageFunction(message_callback);

@@ -1,4 +1,4 @@
-# ASOS — кастомный образ Arch Linux + Hyprland
+# Huilo — кастомный образ Arch Linux + Hyprland
 
 Live/установочный ISO на базе **Arch Linux** (профиль `archiso`) с готовым рабочим окружением:
 
@@ -6,12 +6,12 @@ Live/установочный ISO на базе **Arch Linux** (профиль `
 |---|---|
 | **Рабочий стол** | Hyprland, Waybar, Wofi, Mako, Kitty, Hyprlock/Hypridle, Thunar, PipeWire, NetworkManager, Bluetooth, тёмная тема, раскладка EN/RU (`Alt+Shift`) |
 | **Обход DPI** | [zapret](https://github.com/bol-van/zapret) (`nfqws` + nftables) со **всеми стратегиями [Flowseal](https://github.com/Flowseal/zapret-discord-youtube)** (`general`, `ALT`…`ALT13`, `SIMPLE FAKE`, `FAKE TLS AUTO` …), Game Filter и IPSet Filter как в оригинале. Служба включена сразу. |
-| **Atom game pack** | Steam, Lutris, Wine-staging (+mono/gecko, winetricks), Prism Launcher, GameMode, MangoHud, Gamescope, Mesa/Vulkan 64+32 бит (AMD/Intel/Nouveau), ntsync, сетевые твики (BBR), `asos-game` + список игровых доменов/IP для zapret (Steam, Epic, EA, Ubisoft, Battle.net, Riot, Roblox, Minecraft, FACEIT, Twitch…) |
+| **Atom game pack** | Steam, Lutris, Wine-staging (+mono/gecko, winetricks), Prism Launcher, GameMode, MangoHud, Gamescope, Mesa/Vulkan 64+32 бит (AMD/Intel/Nouveau), ntsync, сетевые твики (BBR), `huilo-game` + список игровых доменов/IP для zapret (Steam, Epic, EA, Ubisoft, Battle.net, Riot, Roblox, Minecraft, FACEIT, Twitch…) |
 | **Офис** | LibreOffice (рус.), Thunderbird, Zathura (PDF), Xournal++, Mousepad, Qalculate, KeePassXC, GIMP, Simple Scan |
 | **Сисадмин** | мониторинг (htop, btop, nvtop, glances, iotop, sysstat, lm_sensors, inxi, hwinfo), сеть (nmap, Wireshark, termshark, tcpdump, mtr, iperf3, dig, nethogs, iftop, bandwhich, arp-scan, socat), удалённый доступ (OpenSSH, sshfs, Remmina, FreeRDP, TigerVNC, FileZilla, PuTTY), диски и восстановление (GParted, testdisk/photorec, ddrescue, Clonezilla, partclone, fsarchiver, smartmontools, nvme-cli, LVM, mdadm, LUKS, btrfs/xfs/f2fs/ntfs/exfat, chntpw), бэкапы (rsync, rclone, restic, borg), виртуализация и контейнеры (Docker + compose/buildx, QEMU, libvirt, virt-manager), IaC (Ansible, OpenTofu, kubectl, Helm, k9s), безопасность (Lynis, ClamAV), Memtest86+, CLI (tmux, neovim, jq/yq, ripgrep, fd, fzf, bat, eza, ncdu, dust, duf…) |
-| **Arduino** | Arduino IDE 2 (+ предустановленное ядро AVR и популярные библиотеки — работает офлайн), arduino-cli, PlatformIO Core, esptool, avrdude, dfu-util, stlink, OpenOCD, flashrom (CH341A), mpremote (MicroPython), PulseView/sigrok (логические анализаторы), терминалы tio/picocom/minicom/CuteCom/moserial, VS Code (Code-OSS); адреса плат ESP32, ESP8266, RP2040, STM32 уже прописаны; udev-правила и группа `uucp` — платы прошиваются без root; `asos-arduino` |
-| **NanoPi** | кросс-компилятор aarch64 (gcc/g++/gdb) + toolchain-файлы CMake/Meson, qemu-user-static (запуск и chroot в aarch64-образы), rkdeveloptool (Rockchip maskrom), xfel/sunxi-tools (Allwinner FEL), u-boot-tools, dtc, Raspberry Pi Imager, caligula, android-tools, avahi/mDNS (`nanopi.local`); `asos-nanopi`: таблица плат, поиск в сети, UART-консоль, запись образа на microSD с проверкой, раздача интернета по кабелю, sysroot |
-| **Установка** | `sudo asos-install` — переносит live-систему со всеми настройками на диск (UEFI → systemd-boot, BIOS → GRUB; ext4 или Btrfs с подтомами) |
+| **Arduino** | Arduino IDE 2 (+ предустановленное ядро AVR и популярные библиотеки — работает офлайн), arduino-cli, PlatformIO Core, esptool, avrdude, dfu-util, stlink, OpenOCD, flashrom (CH341A), mpremote (MicroPython), PulseView/sigrok (логические анализаторы), терминалы tio/picocom/minicom/CuteCom/moserial, VS Code (Code-OSS); адреса плат ESP32, ESP8266, RP2040, STM32 уже прописаны; udev-правила и группа `uucp` — платы прошиваются без root; `huilo-arduino` |
+| **NanoPi** | кросс-компилятор aarch64 (gcc/g++/gdb) + toolchain-файлы CMake/Meson, qemu-user-static (запуск и chroot в aarch64-образы), rkdeveloptool (Rockchip maskrom), xfel/sunxi-tools (Allwinner FEL), u-boot-tools, dtc, Raspberry Pi Imager, caligula, android-tools, avahi/mDNS (`nanopi.local`); `huilo-nanopi`: таблица плат, поиск в сети, UART-консоль, запись образа на microSD с проверкой, раздача интернета по кабелю, sysroot |
+| **Установка** | `sudo huilo-install` — переносит live-систему со всеми настройками на диск (UEFI → systemd-boot, BIOS → GRUB; ext4 или Btrfs с подтомами) |
 
 ## Структура репозитория
 
@@ -23,7 +23,7 @@ scripts/fetch-arduino.sh    предустановка ядер и библио�
 scripts/check-packages.py   проверка списков пакетов по актуальным репозиториям Arch (без сборки)
 scripts/pkg-select.sh       необязательные группы пакетов (--without / --minimal)
 scripts/make-wallpapers.py  генератор обоев и фона меню загрузки
-scripts/install-online.sh   установка ASOS с официального ISO Arch (без сборки образа)
+scripts/install-online.sh   установка Huilo с официального ISO Arch (без сборки образа)
 archiso/                    профиль archiso
   profiledef.sh             параметры образа
   packages.x86_64           список пакетов (разбит по категориям)
@@ -35,9 +35,9 @@ archiso/                    профиль archiso
     etc/zapret/             конфиг zapret и пользовательские списки
     etc/systemd/system/     zapret.service, live-службы
     etc/udev/rules.d/       права на USB-устройства Arduino/ESP/STM32/Rockchip/Allwinner
-    usr/local/bin/          asos-zapret, asos-arduino, asos-nanopi, asos-install, asos-game …
-    usr/share/asos/atom/    Atom game pack: hostlist + ipset игр
-    usr/share/asos/embedded/ toolchain-файлы aarch64 и примеры
+    usr/local/bin/          huilo-zapret, huilo-arduino, huilo-nanopi, huilo-install, huilo-game …
+    usr/share/huilo/atom/    Atom game pack: hostlist + ipset игр
+    usr/share/huilo/embedded/ toolchain-файлы aarch64 и примеры
 vm/                         создание ВМ VirtualBox (Windows PowerShell / bash)
 .github/workflows/          сборка ISO в GitHub Actions
 ```
@@ -58,7 +58,7 @@ sudo ./build.sh
 ./build.sh --docker
 ```
 
-**В GitHub Actions:** вкладка *Actions → Build ASOS ISO → Run workflow*. ISO будет в артефактах сборки;
+**В GitHub Actions:** вкладка *Actions → Build Huilo ISO → Run workflow*. ISO будет в артефактах сборки;
 с галочкой *release* (или при пуше тега `v*`) — в релизе, разбитый на части по 1.9 ГБ (лимит GitHub).
 
 Параметры сборки (переменные окружения):
@@ -71,7 +71,7 @@ sudo ./build.sh
 | `ARDUINO_LIBS` | 15 популярных | библиотеки через `;` |
 | `SKIP_AUR=1` | — | не собирать AUR-пакеты (не будет Arduino IDE, rkdeveloptool, xfel, tio, yay) |
 | `SKIP_ARDUINO=1` | — | не предустанавливать ядра/библиотеки Arduino |
-| `ASOS_WITHOUT` | — | то же, что `--without` |
+| `HUILO_WITHOUT` | — | то же, что `--without` |
 
 Перед долгой сборкой можно за минуту проверить списки пакетов (работает на любой ОС с Python 3):
 
@@ -88,7 +88,7 @@ python3 scripts/check-packages.py
 > подписи — обновление ключей в этом случае не помогает. В live-образе и в ВМ на 20 ГБ ISO не собрать.
 > Лишнее можно закомментировать в `archiso/packages.x86_64`.
 
-Запись на флешку: `sudo dd if=out/asos-*.iso of=/dev/sdX bs=4M status=progress oflag=sync` или Ventoy / Rufus (режим DD).
+Запись на флешку: `sudo dd if=out/huilo-*.iso of=/dev/sdX bs=4M status=progress oflag=sync` или Ventoy / Rufus (режим DD).
 
 ## Установка без лишних программ
 
@@ -116,31 +116,61 @@ sudo ./build.sh --minimal                           # только ядро
 bash i.sh --without games,vscode                     # онлайн-установщик (или спросит сам)
 ```
 
-В установщике с ISO (`asos-install`) группы отмечаются галочками. На установленной системе:
+В установщике с ISO (`huilo-install`) группы отмечаются галочками. На установленной системе:
 
 ```bash
-asos-groups list                  # что установлено
-sudo asos-groups add office       # доставить группу
-sudo asos-groups remove games     # удалить группу вместе с ненужными зависимостями
+huilo-groups list                  # что установлено
+sudo huilo-groups add office       # доставить группу
+sudo huilo-groups remove games     # удалить группу вместе с ненужными зависимостями
 ```
 
 ## Оформление
 
-* **Обои** — шесть оригинальных 4K-обоев, сгенерированных `scripts/make-wallpapers.py` (горы в сумерках, северное
-  сияние, поток, волны, туманность, эмблема ASOS) в палитре Catppuccin Mocha. `SUPER+W` — выбор с предпросмотром,
-  `SUPER+Shift+W` — следующие, `asos-wallpaper random`. Свои картинки — в `~/Изображения/Wallpapers`.
+* **Обои** — фото проекта (№1, по умолчанию) и шесть оригинальных 4K-обоев, сгенерированных `scripts/make-wallpapers.py` (горы в сумерках, северное
+  сияние, поток, волны, туманность, эмблема Huilo) в палитре Catppuccin Mocha. `SUPER+W` — выбор с предпросмотром,
+  `SUPER+Shift+W` — следующие, `huilo-wallpaper random`. Свои картинки — в `~/Изображения/Wallpapers`.
   Плавная смена через awww, фон экрана блокировки — текущие обои с размытием. Меню загрузки BIOS — с фоном.
-* **fastfetch** (`ff`) — собственный логотип ASOS, блоки «Система / Железо / Сеть и ASOS», статус zapret и режима
-  графики. Показывается при открытии терминала (отключить: `touch ~/.config/asos/no-fastfetch`).
+* **fastfetch** (`ff`) — собственный логотип Huilo, блоки «Система / Железо / Сеть и Huilo», статус zapret и режима
+  графики. Показывается при открытии терминала (отключить: `touch ~/.config/huilo/no-fastfetch`).
 * **Консоль** — приглашение starship (скруглённые сегменты: ОС, пользователь, каталог, git, языки, время команды),
   kitty с темой Catppuccin, следом курсора и вкладками-«пилюлями», история на 50 000 команд, fzf (`Ctrl+R`),
-  man-страницы через bat. Текстовая консоль (tty) — в той же палитре, шрифт Terminus, приветствие ASOS.
+  man-страницы через bat. Текстовая консоль (tty) — в той же палитре, шрифт Terminus, приветствие Huilo.
+
+## Журналы и уведомления об ошибках
+
+* `huilo-logwatch` запускается вместе с рабочим столом и следит за системным журналом. При серьёзной ошибке
+  показывает всплывающее уведомление, при критической (упавшая программа, ошибка диска, нехватка памяти, сбой ядра) —
+  красное, которое висит до закрытия. В уведомлении кнопки «Собрать журналы» и «Подробнее». На панели появляется
+  значок с числом ошибок: ЛКМ — список, ПКМ — сбросить, СКМ — собрать журналы. Повторы и известный безобидный шум
+  отфильтрованы; свои исключения — `~/.config/huilo/logwatch-ignore`.
+* `huilo-logs` собирает подробный отчёт в архив `~/huilo-logs-*.tar.gz`: сводка, ошибки и предупреждения журнала,
+  прошлая загрузка, ядро, упавшие службы, аварийные дампы, время загрузки, железо, диски, сеть, графика и сеанс,
+  звук, zapret, история pacman. `huilo-logs --redact` маскирует имена, IP/MAC-адреса и серийные номера — для отправки
+  другим людям. `sudo huilo-logs` добавляет данные, доступные только root (SMART, dmidecode, dmesg).
+
+## Эквалайзер
+
+EasyEffects с плагинами LSP — общесистемный эквалайзер для всего звука. Готовые пресеты: `Balanced` (по умолчанию),
+`Bass`, `Bright`, `Voice`, `Games` (шаги и звуки окружения), `Night`, `Flat`; усиление в каждом компенсировано, клиппинга нет.
+
+```bash
+huilo-eq                 # окно эквалайзера (SUPER+Alt+M, или средняя кнопка мыши на значке звука)
+huilo-eq menu            # выбор пресета (SUPER+Shift+M)
+huilo-eq preset bass     # balanced | bass | bright | voice | games | night | flat
+huilo-eq off / on        # выключить / включить эффекты
+```
+
+## Экран загрузки
+
+После BIOS/UEFI показывается фото проекта (`assets/huilo-photo.jpg`): в меню загрузки BIOS (syslinux) и на экране
+загрузки системы (Plymouth, тема `huilo`, с полосой прогресса и вводом пароля для зашифрованных дисков). Это же фото —
+обои №1 и по умолчанию. Картинки пересобираются `python3 scripts/make-wallpapers.py`.
 
 ## Live-режим
 
-* Автовход: пользователь **`asos`**, пароль **`asos`** (sudo без пароля), графический сеанс стартует сам.
+* Автовход: пользователь **`huilo`**, пароль **`huilo`** (sudo без пароля), графический сеанс стартует сам.
 * Пункт меню *safe graphics: sway without 3D* — упрощённый рабочий стол без 3D-ускорения,
-  *console only* — загрузка без графики (`asos.nogui`).
+  *console only* — загрузка без графики (`huilo.nogui`).
 * `SUPER+F1` — шпаргалка по горячим клавишам, `SUPER+Z` — меню zapret, `SUPER+D` — приложения.
 
 ## Графический сеанс и безопасный режим
@@ -149,7 +179,7 @@ sudo asos-groups remove games     # удалить группу вместе с 
 Свои настройки — в `~/.config/hypr/user.lua`, он подключается последним. В виртуальной машине конфиг сам отключает
 аппаратный курсор и размытие.
 
-Сеанс запускает `asos-session`. Вместо бесконечного цикла падений (логотип Hyprland → чёрный экран) он пробует режимы
+Сеанс запускает `huilo-session`. Вместо бесконечного цикла падений (логотип Hyprland → чёрный экран) он пробует режимы
 по очереди, запоминает рабочий и при неудаче оставляет вас в консоли с подсказкой:
 
 | Режим | Когда |
@@ -160,22 +190,22 @@ sudo asos-groups remove games     # удалить группу вместе с 
 | `sway-software` | **безопасный режим**: sway без GPU — работает везде, те же клавиши, `foot` как терминал |
 
 ```bash
-asos-doctor                       # диагностика графики: драйвер, есть ли 3D, журналы, отчёт в ~/asos-doctor.txt
-asos-session --status             # текущий/запомненный режим
-asos-session --set sway-software  # принудительно (или параметр ядра asos.session=sway-software)
-asos-session --reset              # снова автовыбор
+huilo-doctor                       # диагностика графики: драйвер, есть ли 3D, журналы, отчёт в ~/huilo-doctor.txt
+huilo-session --status             # текущий/запомненный режим
+huilo-session --set sway-software  # принудительно (или параметр ядра huilo.session=sway-software)
+huilo-session --reset              # снова автовыбор
 ```
 
 Hyprland официально не поддерживает виртуальные машины. Лучше всего он работает в VMware Workstation с 3D-ускорением
 и в QEMU/KVM с virtio-gpu + virgl. В VirtualBox нужен контроллер VMSVGA с включённым 3D-ускорением, и даже тогда
-результат зависит от видеокарты ПК — если Hyprland не поднимется, ASOS сам перейдёт в безопасный режим.
+результат зависит от видеокарты ПК — если Hyprland не поднимется, Huilo сам перейдёт в безопасный режим.
 
 ## Обновление уже установленной системы
 
 Без переустановки — новые скрипты, конфиги (старые сохраняются как `*.bak-<дата>`), безопасный режим, пункт загрузки:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash
 ```
 
 Если на tty1 цикл падений — переключитесь на текстовую консоль (`Ctrl+Alt+F2`, в VirtualBox — `Host+F2`, по умолчанию
@@ -190,33 +220,33 @@ Host = правый Ctrl), войдите и выполните команду �
 после простой пересборки образа.
 
 ```bash
-asos-zapret                 # статус
-asos-zapret menu            # TUI-меню (то же по клику на значок в Waybar или SUPER+Z)
-asos-zapret list            # список стратегий
-sudo asos-zapret set general-alt2
-sudo asos-zapret game all   # Game Filter: off | all | tcp | udp
-sudo asos-zapret ipset any  # IPSet Filter: none | any | loaded
-sudo asos-zapret atom on    # Atom game pack: on | off
-asos-zapret check           # проверка Discord / YouTube / Steam / Roblox
-sudo asos-zapret autotest   # перебрать все стратегии и показать результат
-sudo asos-zapret show       # итоговая команда nfqws и порты
+huilo-zapret                 # статус
+huilo-zapret menu            # TUI-меню (то же по клику на значок в Waybar или SUPER+Z)
+huilo-zapret list            # список стратегий
+sudo huilo-zapret set general-alt2
+sudo huilo-zapret game all   # Game Filter: off | all | tcp | udp
+sudo huilo-zapret ipset any  # IPSet Filter: none | any | loaded
+sudo huilo-zapret atom on    # Atom game pack: on | off
+huilo-zapret check           # проверка Discord / YouTube / Steam / Roblox
+sudo huilo-zapret autotest   # перебрать все стратегии и показать результат
+sudo huilo-zapret show       # итоговая команда nfqws и порты
 ```
 
-* Конфиг: `/etc/zapret/asos.conf`
+* Конфиг: `/etc/zapret/huilo.conf`
 * Свои домены: `/etc/zapret/lists/list-general-user.txt`, исключения: `list-exclude-user.txt`,
   свои IP: `ipset-user.txt`, исключения IP: `ipset-exclude-user.txt`.
 * Значок в Waybar: зелёный — работает, красный — выключен; ЛКМ — меню, ПКМ — вкл/выкл.
 
-Если стратегия по умолчанию (`general`) не помогает у вашего провайдера — запустите `sudo asos-zapret autotest`
+Если стратегия по умолчанию (`general`) не помогает у вашего провайдера — запустите `sudo huilo-zapret autotest`
 и выберите стратегию с лучшим результатом.
 
 ## Atom game pack
 
-* Включён по умолчанию: игровые домены (`/usr/share/asos/atom/list-atom-games.txt`) добавляются
+* Включён по умолчанию: игровые домены (`/usr/share/huilo/atom/list-atom-games.txt`) добавляются
   в hostlist zapret, IP-диапазоны игровых серверов (`ipset-atom-games.txt`) — в ipset для Game Filter.
-* Если онлайн-игра всё равно не подключается: `sudo asos-zapret ipset any` (обработка всех IP на игровых портах).
-* Запуск игр с GameMode + MangoHud: в параметрах запуска Steam укажите `asos-game %command%`
-  (`ASOS_HUD=0` — без оверлея, `ASOS_GAMESCOPE="-W 1920 -H 1080 -f"` — через gamescope).
+* Если онлайн-игра всё равно не подключается: `sudo huilo-zapret ipset any` (обработка всех IP на игровых портах).
+* Запуск игр с GameMode + MangoHud: в параметрах запуска Steam укажите `huilo-game %command%`
+  (`HUILO_HUD=0` — без оверлея, `HUILO_GAMESCOPE="-W 1920 -H 1080 -f"` — через gamescope).
   Оверлей MangoHud: `Right Shift + F12`.
 * Proton GE и Heroic Games Launcher есть только в AUR/Flatpak — ставятся после установки по желанию.
 
@@ -227,46 +257,46 @@ sudo asos-zapret show       # итоговая команда nfqws и порт�
   PubSubClient, AccelStepper, RTClib …) уже установлены, интернет не нужен.
 * В «Менеджере плат» сразу видны ESP32, ESP8266, Raspberry Pi Pico и STM32 — адреса индексов прописаны.
 * Права: последовательные порты принадлежат группе `uucp`, пользователь в ней состоит; ModemManager
-  не перехватывает порты плат; DFU/ST-Link/maskrom доступны без `sudo` (`/etc/udev/rules.d/70-asos-embedded.rules`).
+  не перехватывает порты плат; DFU/ST-Link/maskrom доступны без `sudo` (`/etc/udev/rules.d/70-huilo-embedded.rules`).
 
 ```bash
-asos-arduino doctor                  # диагностика: группа, порты, драйверы CH340/CP210x/FTDI, ядра
-asos-arduino boards                  # подключённые платы; клоны на CH340 определяются по USB ID
-asos-arduino upload Blink            # сборка + загрузка, плата и порт определяются сами
-asos-arduino upload MySketch -b esp32:esp32:esp32s3 -p /dev/ttyACM0
-asos-arduino monitor -B 9600
-asos-arduino setup esp32 rp2040 stm32    # доустановить ядра (нужен интернет)
-asos-arduino menu                    # то же в TUI (SUPER+Shift+A)
+huilo-arduino doctor                  # диагностика: группа, порты, драйверы CH340/CP210x/FTDI, ядра
+huilo-arduino boards                  # подключённые платы; клоны на CH340 определяются по USB ID
+huilo-arduino upload Blink            # сборка + загрузка, плата и порт определяются сами
+huilo-arduino upload MySketch -b esp32:esp32:esp32s3 -p /dev/ttyACM0
+huilo-arduino monitor -B 9600
+huilo-arduino setup esp32 rp2040 stm32    # доустановить ядра (нужен интернет)
+huilo-arduino menu                    # то же в TUI (SUPER+Shift+A)
 ```
 
 Также: PlatformIO (`pio`), esptool, mpremote (MicroPython), avrdude, dfu-util, stlink, OpenOCD,
-flashrom, PulseView. Пример `~/Arduino/AsosSerialBridge` — обмен JSON между Arduino и NanoPi/ПК.
+flashrom, PulseView. Пример `~/Arduino/HuiloSerialBridge` — обмен JSON между Arduino и NanoPi/ПК.
 
 ## NanoPi (FriendlyELEC) и другие ARM-платы
 
 ```bash
-asos-nanopi boards                   # платы, SoC, скорость UART, пароли по умолчанию
-asos-nanopi flash FriendlyCore-*.img.gz   # запись на microSD (.img/.gz/.xz/.zst/.zip/.7z) + проверка
-asos-nanopi find                     # найти плату в сети (mDNS + nmap)
-asos-nanopi share enp3s0             # раздать плате интернет по кабелю (ПК = 10.42.0.1)
-asos-nanopi ssh pi@nanopi.local      # вход по ключу
-asos-nanopi console                  # UART-консоль (Rockchip 1500000, Allwinner: ... 115200)
-asos-nanopi usb                      # maskrom (rkdeveloptool) / FEL (xfel, sunxi-fel)
-asos-nanopi chroot rootfs.img        # chroot в aarch64-образ через qemu (поставить пакеты до записи)
-asos-nanopi sysroot pi@nanopi.local  # библиотеки платы для кросс-сборки
-asos-nanopi menu                     # то же в TUI (SUPER+Shift+N)
+huilo-nanopi boards                   # платы, SoC, скорость UART, пароли по умолчанию
+huilo-nanopi flash FriendlyCore-*.img.gz   # запись на microSD (.img/.gz/.xz/.zst/.zip/.7z) + проверка
+huilo-nanopi find                     # найти плату в сети (mDNS + nmap)
+huilo-nanopi share enp3s0             # раздать плате интернет по кабелю (ПК = 10.42.0.1)
+huilo-nanopi ssh pi@nanopi.local      # вход по ключу
+huilo-nanopi console                  # UART-консоль (Rockchip 1500000, Allwinner: ... 115200)
+huilo-nanopi usb                      # maskrom (rkdeveloptool) / FEL (xfel, sunxi-fel)
+huilo-nanopi chroot rootfs.img        # chroot в aarch64-образ через qemu (поставить пакеты до записи)
+huilo-nanopi sysroot pi@nanopi.local  # библиотеки платы для кросс-сборки
+huilo-nanopi menu                     # то же в TUI (SUPER+Shift+N)
 ```
 
 Запись образа защищена: системный диск и live-носитель отклоняются, несъёмные диски — только с `--force`,
 нужно ввести имя устройства, после записи данные сравниваются с образом.
 
-Кросс-компиляция: `aarch64-linux-gnu-gcc`, toolchain-файлы `/usr/share/asos/embedded/aarch64-linux-gnu.{cmake,meson}`,
-готовый пример `/usr/share/asos/embedded/examples/nanopi-hello` (`./deploy.sh pi@nanopi.local`).
-Примеры описаны в `/usr/share/asos/embedded/examples/README.md`.
+Кросс-компиляция: `aarch64-linux-gnu-gcc`, toolchain-файлы `/usr/share/huilo/embedded/aarch64-linux-gnu.{cmake,meson}`,
+готовый пример `/usr/share/huilo/embedded/examples/nanopi-hello` (`./deploy.sh pi@nanopi.local`).
+Примеры описаны в `/usr/share/huilo/embedded/examples/README.md`.
 
-## Установка с официального ISO Arch (без сборки ASOS ISO)
+## Установка с официального ISO Arch (без сборки Huilo ISO)
 
-Скрипт `scripts/install-online.sh` ставит Arch Linux сразу со всеми настройками ASOS: пакеты всех групп
+Скрипт `scripts/install-online.sh` ставит Arch Linux сразу со всеми настройками Huilo: пакеты всех групп
 из `archiso/packages.x86_64`, конфиги, zapret + Flowseal, AUR-пакеты (Arduino IDE и др.), ядро Arduino AVR.
 Группы ставятся по очереди с очисткой кэша, Btrfs со сжатием — поэтому хватает диска 20 ГБ.
 В виртуальной машине автоматически добавляются гостевые дополнения и настройки курсора для Hyprland.
@@ -274,7 +304,7 @@ asos-nanopi menu                     # то же в TUI (SUPER+Shift+N)
 Загрузитесь с официального `archlinux-*.iso` и в консоли live-системы выполните:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh
+curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh
 bash i.sh
 ```
 
@@ -285,21 +315,21 @@ bash i.sh
 `vm/create-vm.ps1` (Windows) и `vm/create-vm.sh` (Linux/macOS) создают и запускают ВМ:
 до 4 ядер и до 8 ГБ ОЗУ (не больше, чем позволяет ПК), диск 20 ГБ на контроллере **SATA/AHCI** (не NVMe),
 EFI, VMSVGA с 3D-ускорением (нужно Hyprland), NAT, USB 3.0 для Arduino/NanoPi, общий буфер обмена.
-ISO берётся из «Загрузок» (`asos-*.iso`, затем `archlinux-*.iso`, затем самый новый `.iso`).
+ISO берётся из «Загрузок» (`huilo-*.iso`, затем `archlinux-*.iso`, затем самый новый `.iso`).
 Для официального ISO Arch скрипт может сам ввести в ВМ команду установщика.
 
 Windows (PowerShell):
 
 ```powershell
 cd $env:USERPROFILE\Downloads
-Invoke-WebRequest https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/vm/create-vm.ps1 -OutFile create-vm.ps1 -UseBasicParsing
+Invoke-WebRequest https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/vm/create-vm.ps1 -OutFile create-vm.ps1 -UseBasicParsing
 powershell -ExecutionPolicy Bypass -File .\create-vm.ps1
 ```
 
 Linux/macOS:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/vm/create-vm.sh
+curl -fsSLO https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/vm/create-vm.sh
 bash create-vm.sh
 ```
 
@@ -310,7 +340,7 @@ bash create-vm.sh
 ## Установка на диск
 
 ```bash
-sudo asos-install
+sudo huilo-install
 ```
 
 Установщик спросит диск, файловую систему (Btrfs/ext4), имя компьютера, пользователя, пароль,

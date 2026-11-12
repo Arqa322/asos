@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Build the ASOS ISO.
+#  Build the Huilo ISO.
 #
 #  On Arch Linux (needs archiso):     sudo ./build.sh [options]
 #  Anywhere with Docker/Podman:       ./build.sh --docker [options]
@@ -20,7 +20,7 @@
 #    FLOWSEAL_REF     Flowseal branch or tag        (default: main)
 #    ARDUINO_CORES    cores to pre-install          (default: arduino:avr)
 #    ARDUINO_LIBS     ';' separated libraries       (default: see fetch-arduino.sh)
-#    ASOS_WITHOUT     same as --without
+#    HUILO_WITHOUT     same as --without
 #    SKIP_AUR=1       do not build AUR packages
 #    SKIP_ARDUINO=1   do not pre-install Arduino cores/libraries
 #    OUT_DIR          default ./out
@@ -31,7 +31,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/out}"
 WORK_DIR="${WORK_DIR:-$ROOT/work}"
 
-WITHOUT="${ASOS_WITHOUT:-}"
+WITHOUT="${HUILO_WITHOUT:-}"
 DOCKER=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -53,7 +53,7 @@ if [[ $DOCKER == 1 ]]; then
 	engine=$(command -v docker || command -v podman) || { echo "docker/podman not found" >&2; exit 1; }
 	exec "$engine" run --rm --privileged \
 		-e ZAPRET_VERSION -e FLOWSEAL_REF -e ARDUINO_CORES -e ARDUINO_LIBS \
-		-e SKIP_AUR -e SKIP_ARDUINO -e ASOS_IN_CONTAINER=1 -e ASOS_WITHOUT="$(tr '\n' ' ' <<<"$EXCLUDED")" \
+		-e SKIP_AUR -e SKIP_ARDUINO -e HUILO_IN_CONTAINER=1 -e HUILO_WITHOUT="$(tr '\n' ' ' <<<"$EXCLUDED")" \
 		-v "$ROOT:/build" -w /build \
 		docker.io/archlinux/archlinux:latest \
 		bash -c 'pacman -Syu --noconfirm --needed archiso base-devel git curl sudo arduino-cli && ./build.sh'
@@ -114,17 +114,17 @@ mkdir -p "$WORK_DIR"
 cp -a "$ROOT/archiso" "$PROFILE"
 
 # optional groups: mkarchiso gets the filtered plain lists; the full tagged lists
-# and the selector go into the image so asos-install can remove groups later
+# and the selector go into the image so huilo-install can remove groups later
 "$ROOT/scripts/pkg-select.sh" "$ROOT/archiso/packages.x86_64" --without "$EXCLUDED" >"$PROFILE/packages.x86_64"
 "$ROOT/scripts/pkg-select.sh" "$ROOT/archiso/packages.aur" --without "$EXCLUDED" >"$PROFILE/packages.aur"
-install -Dm0644 "$ROOT/archiso/packages.x86_64" "$PROFILE/airootfs/usr/share/asos/packages.x86_64"
-install -Dm0755 "$ROOT/scripts/pkg-select.sh" "$PROFILE/airootfs/usr/share/asos/pkg-select.sh"
-install -Dm0755 "$ROOT/scripts/fetch-zapret.sh" "$PROFILE/airootfs/usr/share/asos/fetch-zapret.sh"
+install -Dm0644 "$ROOT/archiso/packages.x86_64" "$PROFILE/airootfs/usr/share/huilo/packages.x86_64"
+install -Dm0755 "$ROOT/scripts/pkg-select.sh" "$PROFILE/airootfs/usr/share/huilo/pkg-select.sh"
+install -Dm0755 "$ROOT/scripts/fetch-zapret.sh" "$PROFILE/airootfs/usr/share/huilo/fetch-zapret.sh"
 {
 	echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%MZ)"
 	echo "GIT_COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 	echo "EXCLUDED_GROUPS=\"$(tr '\n' ' ' <<<"$EXCLUDED" | xargs)\""
-} >"$PROFILE/airootfs/usr/share/asos/build-info"
+} >"$PROFILE/airootfs/usr/share/huilo/build-info"
 echo ":: пакетов в образе: $(wc -l <"$PROFILE/packages.x86_64") (+ AUR: $(wc -l <"$PROFILE/packages.aur"))"
 
 if excluded zapret; then
@@ -147,7 +147,7 @@ if [[ "${SKIP_AUR:-0}" != 1 && -s "$PROFILE/packages.aur" ]]; then
 		cat >>"$PROFILE/pacman.conf" <<EOF
 
 # Local repository with AUR packages, used only while building the ISO
-[asos-aur]
+[huilo-aur]
 SigLevel = Optional TrustAll
 Server = file://$AUR_REPO
 EOF

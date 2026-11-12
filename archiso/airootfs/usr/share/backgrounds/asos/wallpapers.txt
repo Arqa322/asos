@@ -1,6 +1,0 @@
-asos-peaks.jpg	Горы в сумерках
-asos-aurora.jpg	Северное сияние
-asos-flow.jpg	Поток
-asos-waves.jpg	Волны
-asos-nebula.jpg	Туманность
-asos-mark.jpg	Эмблема ASOS

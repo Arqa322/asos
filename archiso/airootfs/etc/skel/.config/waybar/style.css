@@ -29,6 +29,8 @@ window#waybar {
     background: #313244;
 }
 
+#custom-health.error    { color: #1e1e2e; background: #fab387; padding: 0 10px; margin: 4px 0; border-radius: 6px; }
+#custom-health.critical { color: #1e1e2e; background: #f38ba8; padding: 0 10px; margin: 4px 0; border-radius: 6px; }
 #custom-zapret.on  { color: #1e1e2e; background: #a6e3a1; }
 #custom-zapret.off { color: #1e1e2e; background: #f38ba8; }
 #battery.warning   { color: #f9e2af; }

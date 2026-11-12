@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Pre-install Arduino cores and libraries into /etc/skel so that every ASOS
+#  Pre-install Arduino cores and libraries into /etc/skel so that every Huilo
 #  user gets a working Arduino IDE 2 / arduino-cli setup offline:
 #    ~/.arduino15        board index files (Arduino, ESP32, ESP8266, RP2040,
 #                        STM32) + installed cores and their toolchains

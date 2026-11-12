@@ -1,0 +1,7 @@
+huilo-photo.jpg	В пизду (фото)
+huilo-peaks.jpg	Горы в сумерках
+huilo-aurora.jpg	Северное сияние
+huilo-flow.jpg	Поток
+huilo-waves.jpg	Волны
+huilo-nebula.jpg	Туманность
+huilo-mark.jpg	Эмблема Huilo

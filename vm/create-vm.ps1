@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  Create and start an ASOS virtual machine in Oracle VirtualBox (Windows).
+  Create and start an Huilo virtual machine in Oracle VirtualBox (Windows).
 
 .DESCRIPTION
   * 4 CPU cores max (never more than the host has), 8 GB RAM max (never more than half
@@ -8,21 +8,21 @@
     not NVMe — plus the ISO as a SATA DVD drive.
   * EFI firmware, VMSVGA graphics with 3D acceleration and 128 MB VRAM (needed by Hyprland),
     NAT network, audio, USB 3.0 (for Arduino / NanoPi passthrough), shared clipboard.
-  * The ISO is taken from your Downloads folder: asos-*.iso, then archlinux-*.iso, then the
+  * The ISO is taken from your Downloads folder: huilo-*.iso, then archlinux-*.iso, then the
     newest *.iso (or pass -Iso).
-  * After start it can type the ASOS installer command into the Arch live console for you.
+  * After start it can type the Huilo installer command into the Arch live console for you.
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\create-vm.ps1
 .EXAMPLE
-  .\create-vm.ps1 -TypeUpdate      # type the ASOS update command into the running VM
+  .\create-vm.ps1 -TypeUpdate      # type the Huilo update command into the running VM
 .EXAMPLE
-  .\create-vm.ps1 -Iso "D:\iso\archlinux-2026.11.01-x86_64.iso" -Name ASOS-test
+  .\create-vm.ps1 -Iso "D:\iso\archlinux-2026.11.01-x86_64.iso" -Name Huilo-test
 #>
 [CmdletBinding()]
 param(
     [string]$Iso,
-    [string]$Name = "ASOS",
+    [string]$Name = "Huilo",
     [int]$Cpus = 4,
     [int]$MemoryMB = 8192,
     [int]$DiskGB = 20,
@@ -35,8 +35,8 @@ param(
 # command redirected with 2>$null into a terminating error. Exit codes are checked instead.
 $ErrorActionPreference = "Continue"
 $script:AlreadyRunning = $false
-$UpdateCmd = "curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash"
-$InstallCmd = "curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh && bash i.sh"
+$UpdateCmd = "curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/update-installed.sh | sudo bash"
+$InstallCmd = "curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh && bash i.sh"
 
 function Info($m) { Write-Host ":: $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "!! $m" -ForegroundColor Yellow }
@@ -55,7 +55,16 @@ if (-not $vbm) { Fail "VBoxManage.exe не найден — установлен
 $ver = (& $vbm --version) -join ""
 Info "VirtualBox $ver"
 
-# -TypeUpdate: type the ASOS update command into an already running VM
+# the project used to be called ASOS: reuse a VM with the old default name
+if (-not $PSBoundParameters.ContainsKey("Name")) {
+    $vms = & $vbm list vms
+    if (-not ($vms -match '^"Huilo" ') -and ($vms -match '^"ASOS" ')) {
+        $Name = "ASOS"
+        Info "найдена ВМ ASOS (старое имя проекта) — используется она"
+    }
+}
+
+# -TypeUpdate: type the Huilo update command into an already running VM
 # (log in on a text console first: Host key + F2 in the VM window)
 if ($TypeUpdate) {
     $state = ((& $vbm showvminfo $Name --machinereadable 2>$null) | Where-Object { $_ -like 'VMState=*' }) -replace '^VMState="', '' -replace '"$', ''
@@ -90,7 +99,7 @@ if (-not $Iso) {
     if (-not $downloads -or -not (Test-Path $downloads)) { $downloads = Join-Path $env:USERPROFILE "Downloads" }
     Info "ищу ISO в $downloads"
     $all = Get-ChildItem -Path $downloads -Filter *.iso -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-    $pick = ($all | Where-Object Name -like "asos-*.iso" | Select-Object -First 1)
+    $pick = ($all | Where-Object Name -like "huilo-*.iso" | Select-Object -First 1)
     if (-not $pick) { $pick = ($all | Where-Object Name -like "archlinux-*.iso" | Select-Object -First 1) }
     if (-not $pick) { $pick = ($all | Select-Object -First 1) }
     if (-not $pick) { Fail "в $downloads нет файлов .iso — укажите путь: -Iso C:\путь\к\образу.iso" }
@@ -150,7 +159,7 @@ function Invoke-VmStart([string]$vm) {
     return @{ Ok = ($LASTEXITCODE -eq 0); Text = $text }
 }
 
-function Start-AsosVm([string]$vm) {
+function Start-HuiloVm([string]$vm) {
     $state = Get-VmState $vm
     if ($state -in @("running", "paused", "starting", "restoring")) {
         Info "ВМ `"$vm`" уже запущена (состояние: $state) — окно ВМ в VirtualBox Manager"
@@ -223,7 +232,7 @@ function Start-AsosVm([string]$vm) {
 $exists = (& $vbm list vms) -match "^`"$([regex]::Escape($Name))`" "
 $startExisting = $false
 if ($exists -and -not $Recreate) {
-    Info "ВМ `"$Name`" уже существует (пересоздать с нуля: -Recreate, другая ВМ: -Name ASOS2)"
+    Info "ВМ `"$Name`" уже существует (пересоздать с нуля: -Recreate, другая ВМ: -Name Huilo2)"
     $ans = Read-Host "Запустить существующую ВМ `"$Name`"? [Y/n]"
     if ($ans -ne "" -and $ans -notmatch "^[YyДд]") { Fail "отменено" }
     $startExisting = $true
@@ -268,17 +277,17 @@ if (-not $startExisting) {
 }
 
 Info "запуск ВМ"
-if (-not (Start-AsosVm $Name)) { exit 1 }
+if (-not (Start-HuiloVm $Name)) { exit 1 }
 
 # ------------------------------------------- type the installer command
 Write-Host ""
-Write-Host "Команда установщика ASOS для консоли Arch live:" -ForegroundColor Cyan
+Write-Host "Команда установщика Huilo для консоли Arch live:" -ForegroundColor Cyan
 Write-Host "  $InstallCmd"
 Write-Host ""
 $isArchIso = (Split-Path $Iso -Leaf) -like "archlinux-*"
 if ($isArchIso -and -not $NoAutoType -and -not $script:AlreadyRunning) {
     if ($startExisting) {
-        # an existing VM may already have ASOS installed or an installation running: default "no"
+        # an existing VM may already have Huilo installed or an installation running: default "no"
         $ans = Read-Host "Ввести команду установщика в ВМ через $BootWaitSeconds с? Только если ВМ загружается с ISO Arch [y/N]"
         $go = $ans -match "^[YyДд]"
     } else {

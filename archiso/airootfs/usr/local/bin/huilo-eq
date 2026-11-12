@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  huilo-eq — system-wide audio equalizer (EasyEffects + LSP plugins)
+#
+#    huilo-eq                 open the equalizer window
+#    huilo-eq start           start in the background (desktop autostart);
+#                             the first time also loads the Huilo-Balanced preset
+#    huilo-eq preset NAME     Balanced | Bass | Bright | Voice | Games | Night | Flat
+#                             (or any of your own EasyEffects presets)
+#    huilo-eq list            presets
+#    huilo-eq on | off        enable / bypass all effects
+#    huilo-eq menu            pick a preset with wofi (SUPER+Shift+Q)
+# ============================================================================
+set -uo pipefail
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/huilo"
+PRESETS="${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects/output"
+command -v easyeffects >/dev/null || { echo "EasyEffects не установлен: sudo pacman -S easyeffects lsp-plugins-lv2" >&2; exit 1; }
+
+running() { pgrep -x easyeffects >/dev/null; }
+ensure() {
+	running && return 0
+	setsid -f easyeffects --service-mode --hide-window >/dev/null 2>&1
+	for _ in $(seq 1 50); do running && sleep 0.5 && return 0; sleep 0.1; done
+	return 1
+}
+resolve() { # short name -> preset name
+	case "${1,,}" in
+		balanced|баланс*) echo Huilo-Balanced ;; bass|бас*) echo Huilo-Bass ;;
+		bright|ярк*) echo Huilo-Bright ;; voice|голос*) echo Huilo-Voice ;;
+		games|игр*) echo Huilo-Games ;; night|ноч*) echo Huilo-Night ;;
+		flat|ровн*|выкл*) echo Huilo-Flat ;; *) echo "$1" ;;
+	esac
+}
+load() {
+	local p; p=$(resolve "$1")
+	ensure || { echo "EasyEffects не запустился" >&2; return 1; }
+	easyeffects -l "$p" >/dev/null 2>&1 && echo "$p" >"$STATE/eq-preset"
+	command -v notify-send >/dev/null && [[ -n "${WAYLAND_DISPLAY:-}" ]] && notify-send -a Huilo -t 2500 "Эквалайзер" "Пресет: ${p#Huilo-}"
+}
+
+mkdir -p "$STATE"
+case "${1:-open}" in
+	open) ensure; setsid -f easyeffects >/dev/null 2>&1 ;;
+	start)
+		ensure
+		[[ -f "$STATE/eq-preset" ]] || load Huilo-Balanced ;;
+	preset) load "${2:?укажите пресет: huilo-eq list}" ;;
+	list) ls "$PRESETS" 2>/dev/null | sed 's/\.json$//'; echo "текущий: $(cat "$STATE/eq-preset" 2>/dev/null || echo —)" ;;
+	on) ensure; easyeffects -b 2 ;;
+	off) ensure; easyeffects -b 1 ;;
+	menu)
+		choice=$(ls "$PRESETS" 2>/dev/null | sed 's/\.json$//' | wofi --dmenu --prompt "Эквалайзер" --width 320 --height 330) || exit 0
+		[[ -n "$choice" ]] && load "$choice" ;;
+	-h|--help) sed -n '2,14p' "$0" ;;
+	*) sed -n '2,14p' "$0"; exit 1 ;;
+esac

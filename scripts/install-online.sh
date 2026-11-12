@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  ASOS online installer — run from the OFFICIAL Arch Linux ISO (live, root).
+#  Huilo online installer — run from the OFFICIAL Arch Linux ISO (live, root).
 #
-#  Installs Arch Linux with every ASOS setting (Hyprland, zapret + Flowseal,
+#  Installs Arch Linux with every Huilo setting (Hyprland, zapret + Flowseal,
 #  Atom game pack, office, sysadmin tools, Arduino, NanoPi) straight onto a
-#  disk, without building the ASOS ISO first. Works on real hardware and in
+#  disk, without building the Huilo ISO first. Works on real hardware and in
 #  VirtualBox/VMware/QEMU (guest tools are added automatically).
 #
 #  In the Arch live console:
-#    curl -fsSL https://raw.githubusercontent.com/Arqa322/asos/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh
+#    curl -fsSL https://raw.githubusercontent.com/Arqa322/Huilo/claude/arch-hyprland-custom-image-hl6sdl/scripts/install-online.sh -o i.sh
 #    bash i.sh
 #
 #  Non-interactive (all optional):
-#    ASOS_DISK=/dev/sda ASOS_USER=user ASOS_PASSWORD=secret ASOS_HOSTNAME=asos \
-#    ASOS_TZ=Europe/Moscow ASOS_FS=btrfs ASOS_AUTOLOGIN=yes ASOS_YES=1 bash i.sh
+#    HUILO_DISK=/dev/sda HUILO_USER=user HUILO_PASSWORD=secret HUILO_HOSTNAME=huilo \
+#    HUILO_TZ=Europe/Moscow HUILO_FS=btrfs HUILO_AUTOLOGIN=yes HUILO_YES=1 bash i.sh
 #
 #  Leave optional software out:
-#    bash i.sh --without office,games,sysadmin     (or ASOS_WITHOUT="office games")
+#    bash i.sh --without office,games,sysadmin     (or HUILO_WITHOUT="office games")
 #    bash i.sh --minimal                           core system only
 #    bash i.sh --list-groups                       show the groups
 #  Without these the installer asks which groups to skip.
-#  Also: ASOS_SKIP_AUR=1  ASOS_SKIP_ARDUINO=1
+#  Also: HUILO_SKIP_AUR=1  HUILO_SKIP_ARDUINO=1
 # ============================================================================
 set -euo pipefail
 
-WITHOUT="${ASOS_WITHOUT:-}"; WITHOUT_GIVEN=0; LIST_GROUPS=0
+WITHOUT="${HUILO_WITHOUT:-}"; WITHOUT_GIVEN=0; LIST_GROUPS=0
 [[ -n "$WITHOUT" ]] && WITHOUT_GIVEN=1
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -39,10 +39,10 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
-REPO="${ASOS_REPO:-Arqa322/asos}"
-REF="${ASOS_REF:-claude/arch-hyprland-custom-image-hl6sdl}"
+REPO="${HUILO_REPO:-Arqa322/Huilo}"
+REF="${HUILO_REF:-claude/arch-hyprland-custom-image-hl6sdl}"
 MNT=/mnt
-LOG=/root/asos-install.log
+LOG=/root/huilo-install.log
 SRC=""
 
 c_ok=$'\e[32m'; c_warn=$'\e[33m'; c_err=$'\e[31m'; c_b=$'\e[1m'; c_0=$'\e[0m'
@@ -57,18 +57,18 @@ exec > >(tee -a "$LOG") 2>&1
 # Packages that only make sense on the live medium
 LIVE_ONLY=(mkinitcpio-archiso syslinux memtest86+ memtest86+-efi edk2-shell archinstall)
 
-# Files of the ASOS overlay that are live-medium only or must not replace
+# Files of the Huilo overlay that are live-medium only or must not replace
 # the installed system's own copies
 OVERLAY_EXCLUDE=(
 	./etc/passwd ./etc/shadow ./etc/group ./etc/gshadow ./etc/hostname ./etc/localtime
 	./etc/mkinitcpio.conf.d/archiso.conf ./etc/mkinitcpio.d/linux.preset
 	./etc/systemd/system/getty@tty1.service.d
-	./etc/sudoers.d/90-asos-live
+	./etc/sudoers.d/90-huilo-live
 	./etc/systemd/system/etc-pacman.d-gnupg.mount
 	./etc/systemd/system/pacman-init.service
 	./etc/systemd/system/multi-user.target.wants/pacman-init.service
-	./etc/systemd/system/asos-live-setup.service
-	./etc/systemd/system/multi-user.target.wants/asos-live-setup.service
+	./etc/systemd/system/huilo-live-setup.service
+	./etc/systemd/system/multi-user.target.wants/huilo-live-setup.service
 	./etc/systemd/journald.conf.d/volatile-storage.conf
 	./etc/systemd/logind.conf.d/do-not-suspend.conf
 	./etc/pacman.d/hooks ./etc/pacman.d/mirrorlist
@@ -100,11 +100,14 @@ if [[ -n "$here" && -f "$here/../archiso/packages.x86_64" ]]; then
 	SRC=$(cd "$here/.." && pwd)
 	info "используются файлы из $SRC"
 else
-	step "Загрузка ASOS ($REPO @ $REF)"
-	SRC=/root/asos-src
+	step "Загрузка Huilo ($REPO @ $REF)"
+	SRC=/root/huilo-src
 	rm -rf "$SRC"; mkdir -p "$SRC"
-	curl -fsSL --retry 4 "https://codeload.github.com/$REPO/tar.gz/refs/heads/$REF" | tar -xz -C "$SRC" --strip-components=1
-	[[ -f "$SRC/archiso/packages.x86_64" ]] || die "не удалось скачать репозиторий ASOS"
+	# the repository was renamed asos -> Huilo; GitHub redirects the old name
+	for r in "$REPO" Arqa322/asos; do
+		curl -fsSL --retry 3 "https://codeload.github.com/$r/tar.gz/refs/heads/$REF" | tar -xz -C "$SRC" --strip-components=1 2>/dev/null && break
+	done
+	[[ -f "$SRC/archiso/packages.x86_64" ]] || die "не удалось скачать репозиторий Huilo"
 fi
 PROFILE="$SRC/archiso"
 SEL="$SRC/scripts/pkg-select.sh"
@@ -125,31 +128,31 @@ if src=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null); then LIVEDEV=/dev
 echo "Диски:"; printf '  %s\n' "${DISKS[@]}"
 DEFAULT_DISK=""
 [[ ${#DISKS[@]} -eq 1 ]] && DEFAULT_DISK=${DISKS[0]%% *}
-ASOS_DISK=${ASOS_DISK:-}
-ask ASOS_DISK "Диск для установки (ВСЕ ДАННЫЕ БУДУТ УДАЛЕНЫ)" "$DEFAULT_DISK"
-[[ -b "$ASOS_DISK" ]] || die "$ASOS_DISK не найден"
-[[ "$ASOS_DISK" != "$LIVEDEV" ]] || die "$ASOS_DISK — это установочный носитель"
-DISK_GB=$(( $(lsblk -bdno SIZE "$ASOS_DISK") / 1024 / 1024 / 1024 ))
-(( DISK_GB >= 18 )) || die "диск $ASOS_DISK слишком мал (${DISK_GB} ГБ, нужно от 20 ГБ)"
+HUILO_DISK=${HUILO_DISK:-}
+ask HUILO_DISK "Диск для установки (ВСЕ ДАННЫЕ БУДУТ УДАЛЕНЫ)" "$DEFAULT_DISK"
+[[ -b "$HUILO_DISK" ]] || die "$HUILO_DISK не найден"
+[[ "$HUILO_DISK" != "$LIVEDEV" ]] || die "$HUILO_DISK — это установочный носитель"
+DISK_GB=$(( $(lsblk -bdno SIZE "$HUILO_DISK") / 1024 / 1024 / 1024 ))
+(( DISK_GB >= 18 )) || die "диск $HUILO_DISK слишком мал (${DISK_GB} ГБ, нужно от 20 ГБ)"
 
-ASOS_FS=${ASOS_FS:-}; ask ASOS_FS "Файловая система (btrfs — со сжатием, рекомендуется для дисков до 64 ГБ / ext4)" "btrfs"
-[[ "$ASOS_FS" == btrfs || "$ASOS_FS" == ext4 ]] || die "ASOS_FS: btrfs или ext4"
-ASOS_HOSTNAME=${ASOS_HOSTNAME:-}; ask ASOS_HOSTNAME "Имя компьютера" "asos"
-ASOS_USER=${ASOS_USER:-}; ask ASOS_USER "Имя пользователя (латиница, строчные)" "user"
-[[ "$ASOS_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "недопустимое имя пользователя"
-if [[ -z "${ASOS_PASSWORD:-}" ]]; then
+HUILO_FS=${HUILO_FS:-}; ask HUILO_FS "Файловая система (btrfs — со сжатием, рекомендуется для дисков до 64 ГБ / ext4)" "btrfs"
+[[ "$HUILO_FS" == btrfs || "$HUILO_FS" == ext4 ]] || die "HUILO_FS: btrfs или ext4"
+HUILO_HOSTNAME=${HUILO_HOSTNAME:-}; ask HUILO_HOSTNAME "Имя компьютера" "huilo"
+HUILO_USER=${HUILO_USER:-}; ask HUILO_USER "Имя пользователя (латиница, строчные)" "user"
+[[ "$HUILO_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "недопустимое имя пользователя"
+if [[ -z "${HUILO_PASSWORD:-}" ]]; then
 	while true; do
-		read -rsp "Пароль для $ASOS_USER (и для sudo): " p1 </dev/tty; echo
+		read -rsp "Пароль для $HUILO_USER (и для sudo): " p1 </dev/tty; echo
 		read -rsp "Повторите пароль: " p2 </dev/tty; echo
 		[[ -n "$p1" && "$p1" == "$p2" ]] && break
 		echo "Пароли пустые или не совпадают."
 	done
-	ASOS_PASSWORD=$p1
+	HUILO_PASSWORD=$p1
 fi
-ASOS_TZ=${ASOS_TZ:-}; ask ASOS_TZ "Часовой пояс" "Europe/Moscow"
-[[ -f "/usr/share/zoneinfo/$ASOS_TZ" ]] || die "неизвестный часовой пояс $ASOS_TZ"
+HUILO_TZ=${HUILO_TZ:-}; ask HUILO_TZ "Часовой пояс" "Europe/Moscow"
+[[ -f "/usr/share/zoneinfo/$HUILO_TZ" ]] || die "неизвестный часовой пояс $HUILO_TZ"
 DEFAULT_AUTOLOGIN=no; [[ "$VIRT" != none ]] && DEFAULT_AUTOLOGIN=yes
-ASOS_AUTOLOGIN=${ASOS_AUTOLOGIN:-}; ask ASOS_AUTOLOGIN "Автовход и запуск Hyprland без пароля (yes/no)" "$DEFAULT_AUTOLOGIN"
+HUILO_AUTOLOGIN=${HUILO_AUTOLOGIN:-}; ask HUILO_AUTOLOGIN "Автовход и запуск Hyprland без пароля (yes/no)" "$DEFAULT_AUTOLOGIN"
 
 # optional software groups
 if [[ $WITHOUT_GIVEN == 0 ]]; then
@@ -163,35 +166,35 @@ excluded() { grep -qx "$1" <<<"$EXCLUDED"; }
 EXCLUDED_TXT=$(tr '\n' ' ' <<<"$EXCLUDED" | xargs)
 
 echo
-echo "  диск:        ${c_b}$ASOS_DISK${c_0} (${DISK_GB} ГБ), ФС: $ASOS_FS, загрузка: $([[ $UEFI == 1 ]] && echo UEFI/systemd-boot || echo BIOS/GRUB)"
-echo "  компьютер:   $ASOS_HOSTNAME, пользователь: $ASOS_USER, часовой пояс: $ASOS_TZ, автовход: $ASOS_AUTOLOGIN"
+echo "  диск:        ${c_b}$HUILO_DISK${c_0} (${DISK_GB} ГБ), ФС: $HUILO_FS, загрузка: $([[ $UEFI == 1 ]] && echo UEFI/systemd-boot || echo BIOS/GRUB)"
+echo "  компьютер:   $HUILO_HOSTNAME, пользователь: $HUILO_USER, часовой пояс: $HUILO_TZ, автовход: $HUILO_AUTOLOGIN"
 echo "  без групп:   ${EXCLUDED_TXT:-нет (устанавливается всё)}"
-if [[ "${ASOS_YES:-0}" != 1 ]]; then
-	read -rp "${c_err}Диск $ASOS_DISK будет полностью стёрт.${c_0} Введите YES: " ok </dev/tty
+if [[ "${HUILO_YES:-0}" != 1 ]]; then
+	read -rp "${c_err}Диск $HUILO_DISK будет полностью стёрт.${c_0} Введите YES: " ok </dev/tty
 	[[ "$ok" == YES ]] || die "отменено"
 fi
 
 # ------------------------------------------------------------- partition ---
-step "Разметка и форматирование $ASOS_DISK"
+step "Разметка и форматирование $HUILO_DISK"
 umount -R "$MNT" 2>/dev/null || true
 swapoff -a 2>/dev/null || true
-wipefs -af "$ASOS_DISK" >/dev/null
-sgdisk --zap-all "$ASOS_DISK" >/dev/null
+wipefs -af "$HUILO_DISK" >/dev/null
+sgdisk --zap-all "$HUILO_DISK" >/dev/null
 if [[ $UEFI == 1 ]]; then
-	sgdisk -n1:0:+1G -t1:ef00 -c1:ESP -n2:0:0 -t2:8304 -c2:ASOS "$ASOS_DISK" >/dev/null
+	sgdisk -n1:0:+1G -t1:ef00 -c1:ESP -n2:0:0 -t2:8304 -c2:Huilo "$HUILO_DISK" >/dev/null
 else
-	sgdisk -n1:0:+1M -t1:ef02 -c1:BIOSBOOT -n2:0:+1G -t2:8300 -c2:BOOT -n3:0:0 -t3:8304 -c3:ASOS "$ASOS_DISK" >/dev/null
+	sgdisk -n1:0:+1M -t1:ef02 -c1:BIOSBOOT -n2:0:+1G -t2:8300 -c2:BOOT -n3:0:0 -t3:8304 -c3:Huilo "$HUILO_DISK" >/dev/null
 fi
-partprobe "$ASOS_DISK" 2>/dev/null || true
+partprobe "$HUILO_DISK" 2>/dev/null || true
 udevadm settle
-part() { lsblk -lnpo NAME,TYPE "$ASOS_DISK" | awk '$2=="part"{print $1}' | sed -n "${1}p"; }
+part() { lsblk -lnpo NAME,TYPE "$HUILO_DISK" | awk '$2=="part"{print $1}' | sed -n "${1}p"; }
 if [[ $UEFI == 1 ]]; then BOOTP=$(part 1); ROOTP=$(part 2); else BOOTP=$(part 2); ROOTP=$(part 3); fi
 [[ -b "$BOOTP" && -b "$ROOTP" ]] || die "не удалось определить разделы"
 
 if [[ $UEFI == 1 ]]; then mkfs.fat -F32 -n ESP "$BOOTP" >/dev/null; else mkfs.ext4 -qF -L BOOT "$BOOTP"; fi
 ROOTFLAGS=""
-if [[ "$ASOS_FS" == btrfs ]]; then
-	mkfs.btrfs -qf -L ASOS "$ROOTP"
+if [[ "$HUILO_FS" == btrfs ]]; then
+	mkfs.btrfs -qf -L Huilo "$ROOTP"
 	mount "$ROOTP" "$MNT"
 	for sv in @ @home @log @pkg; do btrfs -q subvolume create "$MNT/$sv"; done
 	umount "$MNT"
@@ -203,7 +206,7 @@ if [[ "$ASOS_FS" == btrfs ]]; then
 	mount -o "$opts,subvol=@pkg" "$ROOTP" "$MNT/var/cache/pacman/pkg"
 	ROOTFLAGS="rootflags=subvol=@"
 else
-	mkfs.ext4 -qF -L ASOS "$ROOTP"
+	mkfs.ext4 -qF -L Huilo "$ROOTP"
 	mount "$ROOTP" "$MNT"
 fi
 mkdir -p "$MNT/boot"
@@ -264,30 +267,30 @@ for sec in "${SECTION_NAMES[@]:1}"; do
 done
 
 # ---------------------------------------------------------------- overlay ---
-step "Настройки ASOS (Hyprland, zapret, Atom, Arduino, NanoPi ...)"
+step "Настройки Huilo (Hyprland, zapret, Atom, Arduino, NanoPi ...)"
 excl=(); for e in "${OVERLAY_EXCLUDE[@]}"; do excl+=(--exclude="$e"); done
 tar -C "$PROFILE/airootfs" "${excl[@]}" -cf - . | tar -C "$MNT" --no-same-owner -xf -
-chown -R root:root "$MNT/etc/skel" "$MNT/usr/local/bin" "$MNT/usr/share/asos" "$MNT/etc/zapret"
+chown -R root:root "$MNT/etc/skel" "$MNT/usr/local/bin" "$MNT/usr/share/huilo" "$MNT/etc/zapret"
 chmod 0750 "$MNT/etc/sudoers.d"; chmod 0440 "$MNT/etc/sudoers.d/10-wheel"
 chmod 0755 "$MNT"/usr/local/bin/*
 
-if [[ $ASOS_AUTOLOGIN == yes ]]; then
+if [[ $HUILO_AUTOLOGIN == yes ]]; then
 	mkdir -p "$MNT/etc/systemd/system/getty@tty1.service.d"
 	cat >"$MNT/etc/systemd/system/getty@tty1.service.d/autologin.conf" <<EOF
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin $ASOS_USER - \$TERM
+ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin $HUILO_USER - \$TERM
 EOF
 fi
 
 genfstab -U "$MNT" >"$MNT/etc/fstab"
-echo "$ASOS_HOSTNAME" >"$MNT/etc/hostname"
+echo "$HUILO_HOSTNAME" >"$MNT/etc/hostname"
 cat >"$MNT/etc/hosts" <<EOF
 127.0.0.1   localhost
 ::1         localhost
-127.0.1.1   $ASOS_HOSTNAME.localdomain $ASOS_HOSTNAME
+127.0.1.1   $HUILO_HOSTNAME.localdomain $HUILO_HOSTNAME
 EOF
-ln -sf "/usr/share/zoneinfo/$ASOS_TZ" "$MNT/etc/localtime"
+ln -sf "/usr/share/zoneinfo/$HUILO_TZ" "$MNT/etc/localtime"
 
 ROOT_UUID=$(blkid -s UUID -o value "$ROOTP")
 CMDLINE="root=UUID=$ROOT_UUID rw $ROOTFLAGS quiet splash loglevel=3"
@@ -301,88 +304,91 @@ case "$VIRT" in
 	kvm|qemu) SERVICES+=" qemu-guest-agent.service" ;;
 	vmware) SERVICES+=" vmtoolsd.service" ;;
 esac
-cat >"$MNT/root/asos-setup.sh" <<EOF
+cat >"$MNT/root/huilo-setup.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 hwclock --systohc || true
 locale-gen
-useradd -m -s /bin/bash "$ASOS_USER"
-asos-user-groups "$ASOS_USER"
+useradd -m -s /bin/bash "$HUILO_USER"
+huilo-user-groups "$HUILO_USER"
 passwd -l root
+# boot splash: plymouth hook right after kms (or after systemd/udev)
+sed -i -E '/^HOOKS=/{/plymouth/!s/\bkms\b/kms plymouth/}' /etc/mkinitcpio.conf
+grep -q '^HOOKS=.*plymouth' /etc/mkinitcpio.conf || sed -i -E '/^HOOKS=/s/\b(systemd|udev)\b/\1 plymouth/' /etc/mkinitcpio.conf
 mkinitcpio -P
 if [[ $UEFI == 1 ]]; then
 	bootctl install --esp-path=/boot
 	mkdir -p /boot/loader/entries
-	printf 'default asos.conf\ntimeout 3\nconsole-mode max\neditor no\n' >/boot/loader/loader.conf
-	printf 'title   ASOS (Arch Linux + Hyprland)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux.img\noptions %s\n' "$CMDLINE" >/boot/loader/entries/asos.conf
-	printf 'title   ASOS (fallback initramfs)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux-fallback.img\noptions %s\n' "$CMDLINE" >/boot/loader/entries/asos-fallback.conf
-	printf 'title   ASOS (безопасная графика: sway без 3D)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux.img\noptions %s asos.session=sway-software\n' "$CMDLINE" >/boot/loader/entries/asos-safe.conf
+	printf 'default huilo.conf\ntimeout 3\nconsole-mode max\neditor no\n' >/boot/loader/loader.conf
+	printf 'title   Huilo (Arch Linux + Hyprland)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux.img\noptions %s\n' "$CMDLINE" >/boot/loader/entries/huilo.conf
+	printf 'title   Huilo (fallback initramfs)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux-fallback.img\noptions %s\n' "$CMDLINE" >/boot/loader/entries/huilo-fallback.conf
+	printf 'title   Huilo (безопасная графика: sway без 3D)\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux.img\noptions %s huilo.session=sway-software\n' "$CMDLINE" >/boot/loader/entries/huilo-safe.conf
 	systemctl enable systemd-boot-update.service || true
 else
 	sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT="$ROOTFLAGS quiet splash loglevel=3"|' /etc/default/grub
-	sed -i 's|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR="ASOS"|' /etc/default/grub
-	grub-install --target=i386-pc "$ASOS_DISK"
+	sed -i 's|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR="Huilo"|' /etc/default/grub
+	grub-install --target=i386-pc "$HUILO_DISK"
 	grub-mkconfig -o /boot/grub/grub.cfg
 fi
 for s in $SERVICES; do systemctl enable "\$s" 2>/dev/null || echo "warning: cannot enable \$s"; done
 EOF
-arch-chroot "$MNT" bash /root/asos-setup.sh
-printf '%s:%s\n' "$ASOS_USER" "$ASOS_PASSWORD" | arch-chroot "$MNT" chpasswd
-rm -f "$MNT/root/asos-setup.sh"
+arch-chroot "$MNT" bash /root/huilo-setup.sh
+printf '%s:%s\n' "$HUILO_USER" "$HUILO_PASSWORD" | arch-chroot "$MNT" chpasswd
+rm -f "$MNT/root/huilo-setup.sh"
 
 # -------------------------------------------------- zapret + Flowseal ---
-mkdir -p "$MNT/root/asos-src"
-cp -a "$SRC/scripts" "$SRC/archiso" "$MNT/root/asos-src/"
-# group tools for later changes: asos-groups add/remove/list
-install -Dm0644 "$SRC/archiso/packages.x86_64" "$MNT/usr/share/asos/packages.x86_64"
-install -Dm0755 "$SRC/scripts/pkg-select.sh" "$MNT/usr/share/asos/pkg-select.sh"
-install -Dm0755 "$SRC/scripts/fetch-zapret.sh" "$MNT/usr/share/asos/fetch-zapret.sh"
-printf 'INSTALLED=%s\nEXCLUDED_GROUPS="%s"\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "$EXCLUDED_TXT" >"$MNT/usr/share/asos/build-info"
+mkdir -p "$MNT/root/huilo-src"
+cp -a "$SRC/scripts" "$SRC/archiso" "$MNT/root/huilo-src/"
+# group tools for later changes: huilo-groups add/remove/list
+install -Dm0644 "$SRC/archiso/packages.x86_64" "$MNT/usr/share/huilo/packages.x86_64"
+install -Dm0755 "$SRC/scripts/pkg-select.sh" "$MNT/usr/share/huilo/pkg-select.sh"
+install -Dm0755 "$SRC/scripts/fetch-zapret.sh" "$MNT/usr/share/huilo/fetch-zapret.sh"
+printf 'INSTALLED=%s\nEXCLUDED_GROUPS="%s"\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "$EXCLUDED_TXT" >"$MNT/usr/share/huilo/build-info"
 if excluded zapret; then
 	rm -f "$MNT/etc/systemd/system/multi-user.target.wants/zapret.service"
-	info "zapret не устанавливается (включить позже: sudo asos-groups add zapret)"
+	info "zapret не устанавливается (включить позже: sudo huilo-groups add zapret)"
 else
 	step "zapret + стратегии Flowseal"
-	arch-chroot "$MNT" env DEST=/opt/zapret bash /root/asos-src/scripts/fetch-zapret.sh ||
-		warn "zapret не скачан — позже: sudo asos-groups add zapret"
+	arch-chroot "$MNT" env DEST=/opt/zapret bash /root/huilo-src/scripts/fetch-zapret.sh ||
+		warn "zapret не скачан — позже: sudo huilo-groups add zapret"
 fi
 
 # -------------------------------------------------------------- AUR ---
-"$SEL" "$SRC/archiso/packages.aur" --without "$EXCLUDED" >"$MNT/root/asos-src/aur.list"
-if [[ "${ASOS_SKIP_AUR:-0}" != 1 && -s "$MNT/root/asos-src/aur.list" ]]; then
-	step "AUR: $(tr '\n' ' ' <"$MNT/root/asos-src/aur.list")"
-	echo "$ASOS_USER ALL=(ALL) NOPASSWD: /usr/bin/pacman" >"$MNT/etc/sudoers.d/99-asos-install"
-	chmod 0440 "$MNT/etc/sudoers.d/99-asos-install"
-	arch-chroot "$MNT" env SUDO_USER="$ASOS_USER" bash /root/asos-src/scripts/build-aur.sh \
-		/root/asos-src/aur.list /var/cache/asos-aur || true
+"$SEL" "$SRC/archiso/packages.aur" --without "$EXCLUDED" >"$MNT/root/huilo-src/aur.list"
+if [[ "${HUILO_SKIP_AUR:-0}" != 1 && -s "$MNT/root/huilo-src/aur.list" ]]; then
+	step "AUR: $(tr '\n' ' ' <"$MNT/root/huilo-src/aur.list")"
+	echo "$HUILO_USER ALL=(ALL) NOPASSWD: /usr/bin/pacman" >"$MNT/etc/sudoers.d/99-huilo-install"
+	chmod 0440 "$MNT/etc/sudoers.d/99-huilo-install"
+	arch-chroot "$MNT" env SUDO_USER="$HUILO_USER" bash /root/huilo-src/scripts/build-aur.sh \
+		/root/huilo-src/aur.list /var/cache/huilo-aur || true
 	shopt -s nullglob
-	aurpkgs=("$MNT"/var/cache/asos-aur/*.pkg.tar.*)
+	aurpkgs=("$MNT"/var/cache/huilo-aur/*.pkg.tar.*)
 	shopt -u nullglob
 	if [[ ${#aurpkgs[@]} -gt 0 ]]; then
-		arch-chroot "$MNT" bash -c 'pacman -U --needed --noconfirm /var/cache/asos-aur/*.pkg.tar.*' || warn "часть AUR-пакетов не установилась"
+		arch-chroot "$MNT" bash -c 'pacman -U --needed --noconfirm /var/cache/huilo-aur/*.pkg.tar.*' || warn "часть AUR-пакетов не установилась"
 	fi
-	rm -f "$MNT/etc/sudoers.d/99-asos-install"
-	rm -rf "$MNT/var/cache/asos-aur"
+	rm -f "$MNT/etc/sudoers.d/99-huilo-install"
+	rm -rf "$MNT/var/cache/huilo-aur"
 	clean_cache
 fi
 
 # ------------------------------------------------------------- Arduino ---
-if [[ "${ASOS_SKIP_ARDUINO:-0}" != 1 ]] && ! excluded arduino; then
-	step "Arduino: ядро AVR и библиотеки для $ASOS_USER"
-	arch-chroot "$MNT" sudo -u "$ASOS_USER" -H bash /root/asos-src/scripts/fetch-arduino.sh "/home/$ASOS_USER" ||
-		warn "Arduino не настроен — позже: asos-arduino setup avr"
+if [[ "${HUILO_SKIP_ARDUINO:-0}" != 1 ]] && ! excluded arduino; then
+	step "Arduino: ядро AVR и библиотеки для $HUILO_USER"
+	arch-chroot "$MNT" sudo -u "$HUILO_USER" -H bash /root/huilo-src/scripts/fetch-arduino.sh "/home/$HUILO_USER" ||
+		warn "Arduino не настроен — позже: huilo-arduino setup avr"
 fi
 
 # VM tweaks for Hyprland (cursor, blur) are applied by hyprland.lua itself;
-# asos-session picks a working graphics mode on first login.
+# huilo-session picks a working graphics mode on first login.
 
-rm -rf "$MNT/root/asos-src"
+rm -rf "$MNT/root/huilo-src"
 clean_cache
-cp -f "$LOG" "$MNT/var/log/asos-install.log" 2>/dev/null || true
+cp -f "$LOG" "$MNT/var/log/huilo-install.log" 2>/dev/null || true
 sync
 
 step "Готово"
-echo "  установлено на $ASOS_DISK, свободно $(space)"
+echo "  установлено на $HUILO_DISK, свободно $(space)"
 if [[ ${#FAILED_PKGS[@]} -gt 0 ]]; then
 	warn "не установились пакеты: ${FAILED_PKGS[*]}"
 	warn "после загрузки: sudo pacman -S ${FAILED_PKGS[*]}"
@@ -390,4 +396,4 @@ fi
 umount -R "$MNT" || true
 echo
 echo "  Извлеките ISO (в VirtualBox: Устройства → Оптические диски → Изъять) и выполните: reboot"
-echo "  Пользователь: $ASOS_USER. Журнал установки: /var/log/asos-install.log"
+echo "  Пользователь: $HUILO_USER. Журнал установки: /var/log/huilo-install.log"

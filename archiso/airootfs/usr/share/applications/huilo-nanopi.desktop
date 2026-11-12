@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=NanoPi: инструменты Huilo
+Comment=Прошивка microSD, UART-консоль, поиск в сети, maskrom/FEL, кросс-компиляция
+Exec=kitty --title huilo-nanopi -e huilo-nanopi menu
+Icon=computer
+Terminal=false
+Type=Application
+Categories=Development;Electronics;System;
+Keywords=nanopi;friendlyelec;rockchip;allwinner;sbc;uart;sd;

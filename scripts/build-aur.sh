@@ -6,7 +6,7 @@
 #  usage: build-aur.sh <list-file> <repo-dir>
 #
 #  - makepkg never runs as root: inside the build container a throw-away
-#    "asosbuild" user is created; on a real Arch host the user who called
+#    "huilobuild" user is created; on a real Arch host the user who called
 #    sudo ($SUDO_USER) is used.
 #  - A package that fails to build is skipped and reported; the names of the
 #    packages that were built go to <repo-dir>/built.txt.
@@ -15,24 +15,24 @@ set -uo pipefail
 
 LIST=${1:?usage: build-aur.sh <list-file> <repo-dir>}
 REPO=${2:?usage: build-aur.sh <list-file> <repo-dir>}
-REPO_NAME=asos-aur
+REPO_NAME=huilo-aur
 AUR_URL=${AUR_URL:-https://aur.archlinux.org}
 
 [[ $EUID -eq 0 ]] || { echo "build-aur.sh must run as root" >&2; exit 1; }
 mkdir -p "$REPO"
 REPO=$(realpath "$REPO")
-BUILD_ROOT=$(mktemp -d /var/tmp/asos-aur.XXXXXX)
+BUILD_ROOT=$(mktemp -d /var/tmp/huilo-aur.XXXXXX)
 trap 'rm -rf "$BUILD_ROOT"' EXIT
 
-in_container() { [[ -f /.dockerenv || -f /run/.containerenv || "${ASOS_IN_CONTAINER:-0}" == 1 ]]; }
+in_container() { [[ -f /.dockerenv || -f /run/.containerenv || "${HUILO_IN_CONTAINER:-0}" == 1 ]]; }
 
 if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]]; then
 	BUILDER=$SUDO_USER
 elif in_container; then
-	BUILDER=asosbuild
+	BUILDER=huilobuild
 	id "$BUILDER" &>/dev/null || useradd -m -r -s /bin/bash "$BUILDER"
-	echo "$BUILDER ALL=(ALL) NOPASSWD: /usr/bin/pacman" >/etc/sudoers.d/90-asosbuild
-	chmod 0440 /etc/sudoers.d/90-asosbuild
+	echo "$BUILDER ALL=(ALL) NOPASSWD: /usr/bin/pacman" >/etc/sudoers.d/90-huilobuild
+	chmod 0440 /etc/sudoers.d/90-huilobuild
 else
 	echo "Run via 'sudo ./build.sh' from a normal user, or use './build.sh --docker'." >&2
 	exit 1

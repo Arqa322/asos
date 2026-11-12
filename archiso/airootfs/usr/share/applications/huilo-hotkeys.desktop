@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Горячие клавиши Huilo
+Exec=kitty --title huilo-help -e less /usr/share/huilo/HOTKEYS.txt
+Icon=preferences-desktop-keyboard-shortcuts
+Terminal=false
+Type=Application
+Categories=Utility;

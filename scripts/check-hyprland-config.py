@@ -25,7 +25,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG = os.path.join(ROOT, "archiso", "airootfs", "etc", "skel", ".config", "hypr", "hyprland.lua")
 REPO = "https://github.com/hyprwm/Hyprland"
-UA = {"User-Agent": "asos-check-hyprland-config"}
+UA = {"User-Agent": "huilo-check-hyprland-config"}
 
 
 def get(url):

@@ -1,13 +1,13 @@
 [Unit]
-Description=zapret DPI bypass (nfqws + Flowseal strategies, ASOS)
+Description=zapret DPI bypass (nfqws + Flowseal strategies, Huilo)
 Documentation=https://github.com/bol-van/zapret https://github.com/Flowseal/zapret-discord-youtube
 Wants=network-online.target
 After=network-online.target nftables.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/asos-zapret run
-ExecStopPost=/usr/local/bin/asos-zapret fw-down
+ExecStart=/usr/local/bin/huilo-zapret run
+ExecStopPost=/usr/local/bin/huilo-zapret fw-down
 Restart=on-failure
 RestartSec=5
 ProtectHome=yes

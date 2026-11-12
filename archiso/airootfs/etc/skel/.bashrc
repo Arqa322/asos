@@ -1,4 +1,4 @@
-# ~/.bashrc (ASOS)
+# ~/.bashrc (Huilo)
 [[ $- != *i* ]] && return
 
 # ---------------------------------------------------------------- history
@@ -29,10 +29,10 @@ alias diff='diff --color=auto'
 alias ip='ip -color=auto'
 alias ..='cd ..'
 alias ...='cd ../..'
-alias z='asos-zapret'
+alias z='huilo-zapret'
 alias update='sudo pacman -Syu'
 alias ff='fastfetch'
-alias wall='asos-wallpaper pick'
+alias wall='huilo-wallpaper pick'
 
 # ------------------------------------------------------------ completion
 [[ -r /usr/share/bash-completion/bash_completion ]] && . /usr/share/bash-completion/bash_completion
@@ -55,9 +55,9 @@ fi
 
 # --------------------------------------------------------------- welcome
 # system summary once per new terminal window (not on the text console, not in
-# tmux/screen or VS Code, not in nested shells); disable: touch ~/.config/asos/no-fastfetch
-if [[ "$TERM" != linux && -z "${TMUX:-}${STY:-}" && "${TERM_PROGRAM:-}" != vscode && -z "${ASOS_FETCHED:-}" \
-	&& ! -e ~/.config/asos/no-fastfetch ]] && command -v fastfetch >/dev/null; then
-	export ASOS_FETCHED=1
+# tmux/screen or VS Code, not in nested shells); disable: touch ~/.config/huilo/no-fastfetch
+if [[ "$TERM" != linux && -z "${TMUX:-}${STY:-}" && "${TERM_PROGRAM:-}" != vscode && -z "${HUILO_FETCHED:-}" \
+	&& ! -e ~/.config/huilo/no-fastfetch ]] && command -v fastfetch >/dev/null; then
+	export HUILO_FETCHED=1
 	fastfetch
 fi

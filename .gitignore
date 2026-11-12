@@ -3,3 +3,5 @@
 /work/
 # Downloaded at build time by scripts/fetch-zapret.sh
 /archiso/airootfs/opt/zapret/
+__pycache__/
+*.pyc

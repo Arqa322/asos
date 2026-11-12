@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  pkg-select.sh — optional package groups of ASOS
+#  pkg-select.sh — optional package groups of Huilo
 #
 #  Package lists (archiso/packages.x86_64, archiso/packages.aur) are split into
 #  sections "# ---------- [tag] Name ----------". Untagged sections are the core
