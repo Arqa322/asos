@@ -40,7 +40,7 @@ info "пакеты: безопасный режим, оформление, эк�
 pkgs=(sway foot drm-info mesa-utils awww starship fastfetch kbd terminus-font jq
 	plymouth easyeffects lsp-plugins-lv2 calf pipewire-audio
 	rofi rofi-emoji rofi-calc wtype swaync swayosd hyprsunset adw-gtk-theme capitaine-cursors
-	papirus-icon-theme inter-font dconf gum qt6ct)
+	papirus-icon-theme inter-font dconf gum qt6ct rtkit upower)
 case "$(systemd-detect-virt --vm 2>/dev/null || true)" in
 	oracle) pkgs+=(virtualbox-guest-utils) ;;
 	vmware) pkgs+=(open-vm-tools) ;;
@@ -109,6 +109,15 @@ rm -f /etc/skel/.config/hypr/hyprland.conf /etc/skel/.config/hypr/user.conf
 cp -a "$A/etc/skel/." /etc/skel/
 systemctl daemon-reload
 systemctl enable huilo-vtrgb.service 2>/dev/null || true
+# NetworkManager owns the network: a running systemd-networkd made network-online
+# wait 2 minutes (and zapret with it); bluetooth / NM dispatcher need their D-Bus names
+if systemctl is-enabled --quiet NetworkManager.service 2>/dev/null; then
+	systemctl mask systemd-networkd.service systemd-networkd.socket systemd-networkd-varlink.socket \
+		systemd-networkd-resolve-hook.socket systemd-networkd-wait-online.service \
+		systemd-networkd-persistent-storage.service >/dev/null 2>&1 || true
+	systemctl enable NetworkManager-dispatcher.service >/dev/null 2>&1 || true
+fi
+systemctl is-enabled --quiet bluetooth.service 2>/dev/null && systemctl enable bluetooth.service >/dev/null 2>&1 || true
 systemctl is-enabled --quiet zapret.service 2>/dev/null && systemctl restart zapret.service || true
 udevadm control --reload 2>/dev/null || true
 sysctl --system >/dev/null 2>&1 || true

@@ -144,6 +144,8 @@ lsp-plugins-lv2
 calf
 # provides lv2-host for lsp-plugins (otherwise pacman would pull in Ardour)
 pipewire-audio
+# realtime priority for PipeWire (fewer crackles)
+rtkit
 alsa-utils
 mpv
 imv

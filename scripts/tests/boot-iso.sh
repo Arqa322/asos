@@ -102,9 +102,22 @@ log="$OUT/serial.log"
 } >"$OUT/summary.txt"
 cat "$OUT/summary.txt"
 
+rc=0
 if grep -a -q -E 'huilo-session.*(работает|works)' "$log" 2>/dev/null; then
 	echo ":: graphical session is up"
-	exit 0
+else
+	echo "!! the graphical session did not report success — see screenshots and $OUT/serial.log"; rc=1
 fi
-echo "!! the graphical session did not report success — see screenshots and $OUT/serial.log"
-exit 1
+failed=$(grep -a -E 'Failed to start' "$log" 2>/dev/null | sed 's/\x1b\[[0-9;:]*m//g' | sort -u)
+if [[ -n "$failed" ]]; then
+	echo "!! services that failed to start:"; echo "$failed"; rc=1
+fi
+zt=$(grep -a -m1 'Started zapret' "$log" 2>/dev/null | sed -n 's/^\[ *\([0-9]*\)\..*/\1/p')
+if [[ -z "$zt" ]]; then
+	echo "!! zapret did not start"; rc=1
+elif (( zt > 60 )); then
+	echo "!! zapret started only ${zt}s after boot"; rc=1
+else
+	echo ":: zapret started ${zt}s after boot"
+fi
+exit $rc

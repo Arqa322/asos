@@ -73,6 +73,8 @@ hl.env("GDK_BACKEND", "wayland,x11,*")
 hl.env("SDL_VIDEODRIVER", "wayland,x11")
 hl.env("MOZ_ENABLE_WAYLAND", "1")
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
+-- virtual GPUs rarely have Vulkan: GTK 4 apps would probe it first and log errors
+if VM then hl.env("GSK_RENDERER", "ngl") end
 
 ----------------------------------------------------------- look and feel ---
 hl.config({
